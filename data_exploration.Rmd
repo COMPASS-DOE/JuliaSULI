@@ -1,0 +1,85 @@
+---
+title: "EXCHANGE Data Exploration"
+output: html_document
+date: "2022-10-07"
+---
+
+## Set-Up
+```{r setup, include=FALSE, warning = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# load packages
+library(tidyr)
+library(broom)
+library(ggplot2)
+library(dplyr)
+```
+
+```{r}
+# build RData file for starting files - files imported in from csv downloads
+save(sample_collection_metadata, water_NPOC_TDN, site_metadata, file = "EC1_raw_data.RData")
+
+# load(EC1_raw_data.RData) will bring this into the environment!
+```
+
+## Data Preparation
+```{r}
+# simplify data frame to include coordinates and N/C metrics
+water_sample_metadata <- sample_collection_metadata[, c(1:3)]
+water <- left_join(water_NPOC_TDN, water_sample_metadata, by = "kit_id")
+water <- left_join(water, site_metadata, by = "kit_id")
+water_map <- water[,c(3,5,6,9,10,14)]
+```
+
+## Load In More Packages for Mapping
+```{r, message=FALSE, warning=FALSE}
+library(sf)
+library(ggspatial)
+# both of these packages integrate with ggplot for displaying spatial data
+
+library(rnaturalearth)
+library(rnaturalearthdata)
+library(rnaturalearthhires)
+# this package has important information about the US for drawing map boundaries
+```
+
+## Making Maps
+```{r}
+# pull info from rnaturalearth package to get world information
+usa <- ne_countries(country = "United States of America", returnclass = "sf", scale = "large")
+lakes <- rnaturalearth::ne_download(scale = 10, type = 'lakes', category = 'physical', returnclass = "sf")
+
+# getting error message here to get more detail map attributes - address later!!
+
+# all water sampling locations plotted!
+ggplot(data = usa) +
+  geom_sf() +
+  coord_sf(xlim = c(-95,-75), ylim = c(35,50)) +
+  geom_point(data = water, mapping = aes(x = water_longitude, y = water_latitude))
+```
+
+```{r}
+# divide dataframe into two by region for easier mapping
+water$region <- as.factor(water$region)
+CB_water <- water %>%
+  filter(region == "Chesapeake Bay")
+GL_water <- water %>%
+  filter(region == "Great Lakes")
+
+# zoomed in map for Chesapeake Region with NPOC values
+ggplot(data = usa) +
+  geom_sf() +
+  coord_sf(xlim = c(-77.5,-74.5), ylim = c(37.2,40)) +
+  geom_point(data = CB_water, mapping = aes(x = water_longitude, y = water_latitude, color = npoc_mgl)) +
+  theme_bw() +
+  labs(x = "Longitude", y = "Latitude", color = "NPOC (mg/L)")
+
+# zoomed in map for the Great Lakes
+ggplot(data = usa) +
+  geom_sf() +
+  coord_sf(xlim = c(-95,-78), ylim = c(40,48)) +
+  geom_point(data = GL_water, mapping = aes(x = water_longitude, y = water_latitude, color = npoc_mgl)) +
+  theme_bw() +
+  labs(x = "Longitude", y = "Latitude", color = "NPOC (mg/L)")
+```
+
