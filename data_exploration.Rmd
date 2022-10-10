@@ -5,6 +5,7 @@ date: "2022-10-07"
 ---
 
 ## Set-Up
+
 ```{r setup, include=FALSE, warning = FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
@@ -13,25 +14,46 @@ library(tidyr)
 library(broom)
 library(ggplot2)
 library(dplyr)
+library(ggpubr)
 ```
 
 ```{r}
 # build RData file for starting files - files imported in from csv downloads
-save(sample_collection_metadata, water_NPOC_TDN, site_metadata, file = "EC1_raw_data.RData")
+save(sample_collection_metadata, water_NPOC_TDN, site_metadata,water_spectral_indices, file = "EC1_raw_data.RData")
 
 # load(EC1_raw_data.RData) will bring this into the environment!
 ```
 
 ## Data Preparation
+
 ```{r}
 # simplify data frame to include coordinates and N/C metrics
 water_sample_metadata <- sample_collection_metadata[, c(1:3)]
 water <- left_join(water_NPOC_TDN, water_sample_metadata, by = "kit_id")
 water <- left_join(water, site_metadata, by = "kit_id")
 water_map <- water[,c(3,5,6,9,10,14)]
+
+# match up the spectral data with location of sites and DOC
+water_CDOM <- left_join(water, water_spectral_indices, by = c("kit_id", "campaign", "transect_location"))
+
+# pull out the kits without CDOM data to remove NAs
+water_CDOM_final <- water_CDOM %>%
+  filter(!is.na(SUVA254))
+
+# remove additional columns for dataset ready for analysis
+water_CDOM_final <- water_CDOM_final[,c(3,5,6,9,10,14,20:30)]
+
+# make a list of the sites missing CDOM data
+water_CDOM_missing <- water_CDOM %>%
+  filter(is.na(SUVA254))
+
+water_CDOM_missing <- water_CDOM_missing
+
+water_CDOM_missing <- as.data.frame(water_CDOM_missing)
 ```
 
 ## Load In More Packages for Mapping
+
 ```{r, message=FALSE, warning=FALSE}
 library(sf)
 library(ggspatial)
@@ -44,6 +66,7 @@ library(rnaturalearthhires)
 ```
 
 ## Making Maps
+
 ```{r}
 # pull info from rnaturalearth package to get world information
 usa <- ne_countries(country = "United States of America", returnclass = "sf", scale = "large")
@@ -55,7 +78,8 @@ lakes <- rnaturalearth::ne_download(scale = 10, type = 'lakes', category = 'phys
 ggplot(data = usa) +
   geom_sf() +
   coord_sf(xlim = c(-95,-75), ylim = c(35,50)) +
-  geom_point(data = water, mapping = aes(x = water_longitude, y = water_latitude))
+  geom_point(data = water, mapping = aes(x = water_longitude, y = water_latitude, label = kit_id)) +
+  geom_label(data = water, aes(x = water_longitude, y = water_latitude, label = kit_id))
 ```
 
 ```{r}
@@ -82,4 +106,83 @@ ggplot(data = usa) +
   theme_bw() +
   labs(x = "Longitude", y = "Latitude", color = "NPOC (mg/L)")
 ```
+
+## Looking at Relationships between Different Spectral Indices
+
+```{r}
+# SUVA254 vs S350-400
+ggplot(water_CDOM_final, aes(x = SUVA254, y = S350_400)) +
+  geom_point() +
+  theme_bw() +
+  stat_cor()
+```
+
+```{r}
+# S350-400 vs S275-295
+ggplot(water_CDOM_final, aes(x = S275_295, y = S350_400)) +
+  geom_point() +
+  theme_bw() +
+  stat_cor()
+```
+
+```{r}
+# building a correlation plot!
+# prepping data frame with just the variables for calculated correlations
+water_corr_plot <- water_CDOM_final[,c(2,7,8,10,12:17)]
+
+# load packages for visualization
+library(ggcorrplot)
+
+# compute the correlation matrix for NPOC and the calculated spectral indices
+water_corr_matrix <- cor(water_corr_plot)
+
+# calculate p-values for correlations
+water_corr_pvalue <- cor_pmat(water_corr_plot)
+
+# basic correlation plot with correlation coefficients
+ggcorrplot(water_corr_matrix, hc.order = TRUE,
+    type = "lower", lab = TRUE)
+
+# make the correlation plot with significance values
+ggcorrplot(water_corr_matrix, hc.order = TRUE,
+    type = "lower", method = "circle", p.mat = water_corr_pvalue)
+```
+
+## Exploratory PCA (look at potentially redundant CDOM metrics)
+
+```{r}
+# https://www.statology.org/principal-components-analysis-in-r/
+# set up data frame
+water_pca <- water_CDOM_final[,c(7,8,10,12:17)]
+
+# pull kit IDs to change the row names for labels on the PCA plot
+kit_id <- water_CDOM_final[,1]
+
+# change row names of data frame used for PCA
+rownames(water_pca) <- kit_id
+```
+
+```{r}
+# calculate the principal components
+pc <- prcomp(water_pca, scale = TRUE)
+
+# reverse signs of eigenvectors
+pc$rotation <- -1*pc$rotation
+
+# look at the principal components
+pc$rotation
+
+# reverse signs of each observation's principal components scores
+pc$x <- -1*pc$x
+
+# calculate variance represented by each of the principal components
+pc$sdev^2 / sum(pc$sdev^2)
+```
+
+```{r}
+# visualize the PCA
+biplot(pc, scale = 0)
+```
+
+## Trying an NMDS to Look at Similar Waters
 
