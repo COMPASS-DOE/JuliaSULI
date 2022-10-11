@@ -186,3 +186,45 @@ biplot(pc, scale = 0)
 
 ## Trying an NMDS to Look at Similar Waters
 
+```{r}
+# https://jonlefcheck.net/2012/10/24/nmds-tutorial-in-r/
+# load necessary packages
+library(vegan)
+
+# run the NMDS use the data frame made for the PCA
+site_NMDS = metaMDS(water_pca, k =2)
+
+# Shepard plot to look at the stress
+stressplot(site_NMDS)
+
+# plot the NMDS
+plot(site_NMDS)
+
+# better plot with labels (run all lines together)
+ordiplot(site_NMDS, type = "n")
+orditorp(site_NMDS, display = "species")
+orditorp(site_NMDS, display = "sites", cex = 1.25)
+```
+
+## Cluster Analysis (for a better visual)
+
+```{r}
+# http://www.sthda.com/english/wiki/beautiful-dendrogram-visualizations-in-r-5-must-known-methods-unsupervised-machine-learning
+
+# compute Euclidean distance between samples
+water_dist <- dist(scale(water_pca), method = "euclidean")
+
+# hierarchical clustering based on the distance matrix
+water_cluster <- hclust(water_dist, method = "ward.D2")
+
+# load package for dendrogram visualization
+library(ggdendro)
+
+# draw the tree!
+ggdendrogram(water_cluster)
+
+# another variation of the tree to visualize the clusters directly (run both lines of code together)
+plot(water_cluster, hang = -1) # hang = pulls all of the labels to the same location on the tree
+rect.hclust(water_cluster, k =6)
+```
+
