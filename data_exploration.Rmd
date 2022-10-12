@@ -15,6 +15,7 @@ library(broom)
 library(ggplot2)
 library(dplyr)
 library(ggpubr)
+library(viridis)
 ```
 
 ```{r}
@@ -31,7 +32,18 @@ save(sample_collection_metadata, water_NPOC_TDN, site_metadata,water_spectral_in
 water_sample_metadata <- sample_collection_metadata[, c(1:3)]
 water <- left_join(water_NPOC_TDN, water_sample_metadata, by = "kit_id")
 water <- left_join(water, site_metadata, by = "kit_id")
-water_map <- water[,c(3,5,6,9,10,14)]
+water_map <- water[,c(3:5,6,9,10,14)]
+
+# add a new variable to look at the major water body where samples were taken, not just the region
+water <- water %>%
+  mutate(water_body = case_when(
+    state == "OH" ~ "Lake Erie",
+    state == "VA" | state == "MD" ~ "Chesapeake Bay",
+    state == "DE" | state == "PA" | state == "NJ" ~ "Delaware Bay",
+    kit_id == "K019" | kit_id == "K020" | kit_id == "K033" ~ "Lake Superior",
+    kit_id == "K012" | kit_id == "K013" ~ "Lake Huron",
+    kit_id == "K039" | kit_id == "K047" | kit_id == "K049" ~ "Lake Michigan"
+  ))
 
 # match up the spectral data with location of sites and DOC
 water_CDOM <- left_join(water, water_spectral_indices, by = c("kit_id", "campaign", "transect_location"))
@@ -41,15 +53,18 @@ water_CDOM_final <- water_CDOM %>%
   filter(!is.na(SUVA254))
 
 # remove additional columns for dataset ready for analysis
-water_CDOM_final <- water_CDOM_final[,c(3,5,6,9,10,14,20:30)]
+water_CDOM_final <- water_CDOM_final[,c(3,5,6,9,10,13,14,20:31)]
 
 # make a list of the sites missing CDOM data
 water_CDOM_missing <- water_CDOM %>%
   filter(is.na(SUVA254))
 
-water_CDOM_missing <- water_CDOM_missing
+water_CDOM_missing <- water_CDOM_missing[,3]
 
 water_CDOM_missing <- as.data.frame(water_CDOM_missing)
+
+# remove kit 41 - can be replaced once that metadata is filled in
+water_CDOM_final <- water_CDOM_final[-18,]
 ```
 
 ## Load In More Packages for Mapping
@@ -69,7 +84,8 @@ library(rnaturalearthhires)
 
 ```{r}
 # pull info from rnaturalearth package to get world information
-usa <- ne_countries(country = "United States of America", returnclass = "sf", scale = "large")
+usa <- ne_states(country = "United States of America", returnclass = "sf")
+gl <- ne_states(country = c("United States of America", "Canada"), returnclass = "sf")
 lakes <- rnaturalearth::ne_download(scale = 10, type = 'lakes', category = 'physical', returnclass = "sf")
 
 # getting error message here to get more detail map attributes - address later!!
@@ -80,6 +96,7 @@ ggplot(data = usa) +
   coord_sf(xlim = c(-95,-75), ylim = c(35,50)) +
   geom_point(data = water, mapping = aes(x = water_longitude, y = water_latitude, label = kit_id)) +
   geom_label(data = water, aes(x = water_longitude, y = water_latitude, label = kit_id))
+# geom_label has to be fed the aesthetics to replace a point with the name of the point
 ```
 
 ```{r}
@@ -99,9 +116,9 @@ ggplot(data = usa) +
   labs(x = "Longitude", y = "Latitude", color = "NPOC (mg/L)")
 
 # zoomed in map for the Great Lakes
-ggplot(data = usa) +
+ggplot(data = gl) +
   geom_sf() +
-  coord_sf(xlim = c(-95,-78), ylim = c(40,48)) +
+  coord_sf(xlim = c(-92,-82), ylim = c(40,48)) +
   geom_point(data = GL_water, mapping = aes(x = water_longitude, y = water_latitude, color = npoc_mgl)) +
   theme_bw() +
   labs(x = "Longitude", y = "Latitude", color = "NPOC (mg/L)")
@@ -153,7 +170,7 @@ ggcorrplot(water_corr_matrix, hc.order = TRUE,
 ```{r}
 # https://www.statology.org/principal-components-analysis-in-r/
 # set up data frame
-water_pca <- water_CDOM_final[,c(7,8,10,12:17)]
+water_pca <- water_CDOM_final[,c(9,10,12,14:19)]
 
 # pull kit IDs to change the row names for labels on the PCA plot
 kit_id <- water_CDOM_final[,1]
@@ -182,6 +199,28 @@ pc$sdev^2 / sum(pc$sdev^2)
 ```{r}
 # visualize the PCA
 biplot(pc, scale = 0)
+
+# use ggplot tool for PCA plotting to add outside metadata
+library(ggfortify) #ggfortify allows ggplot to work with PCA data
+# https://cran.r-project.org/web/packages/ggfortify/vignettes/plot_pca.html
+
+autoplot(pc, data = water_CDOM_final, colour = 'water_body', size = 3, loadings = TRUE,
+         loadings.colour = 'black', loadings.label = TRUE) +
+  theme_bw()
+```
+
+```{r}
+# plot SUVA on a map for regional trends (Chesapeake area specifically)
+CDOM_CB <- water_CDOM_final %>%
+  filter(region == "Chesapeake Bay")
+
+ggplot(data = usa) +
+  geom_sf() +
+  coord_sf(xlim = c(-77.5,-74.5), ylim = c(37.2,40)) +
+  geom_point(data = CDOM_CB, mapping = aes(x = water_longitude, y = water_latitude, color = SUVA254)) +
+  theme_bw() +
+  labs(x = "Longitude", y = "Latitude", color = "SUVA 254") +
+  scale_color_viridis()
 ```
 
 ## Trying an NMDS to Look at Similar Waters
@@ -215,10 +254,11 @@ orditorp(site_NMDS, display = "sites", cex = 1.25)
 water_dist <- dist(scale(water_pca), method = "euclidean")
 
 # hierarchical clustering based on the distance matrix
-water_cluster <- hclust(water_dist, method = "ward.D2")
+water_cluster <- hclust(water_dist, method = "complete")
 
 # load package for dendrogram visualization
 library(ggdendro)
+library(dendextend) #used for more functionality with dendrograms
 
 # draw the tree!
 ggdendrogram(water_cluster)
@@ -226,5 +266,37 @@ ggdendrogram(water_cluster)
 # another variation of the tree to visualize the clusters directly (run both lines of code together)
 plot(water_cluster, hang = -1) # hang = pulls all of the labels to the same location on the tree
 rect.hclust(water_cluster, k =6)
+```
+
+```{r}
+# pull data out of the dendrogram data class to be able to color the branches by a metadata variable
+# https://towardsdatascience.com/custom-coloring-dendrogram-ends-in-r-f1fa45e5077a
+
+# save dendrogram as an object
+water_dendr <- as.dendrogram(water_cluster)
+
+# extract dendrogram segement data to build own figure
+dendr_data <- dendro_data(water_dendr)
+dendr_segments <- dendr_data$segments
+
+# pull out the segment ends and merge data with metadata for grouping by water body with colors
+dendr_ends <- dendr_segments %>%
+  filter(yend == 0) %>%
+  left_join(dendr_data$labels, by = "x") %>%
+  rename(kit_id = label) %>%
+  left_join(water_CDOM_final, by = "kit_id")
+
+# create vector of colors for the different regions
+water_body_colors <- c("Chesapeake Bay" = "red" , "Delaware Bay" = "orange", "Lake Erie" = "green", "Lake Huron" = "blue", "Lake Michigan" = "purple", "Lake Superior" = "black")
+
+# plot the dendrogram
+ggplot() +
+ geom_segment(data = dendr_segments, aes(x=x, y=y, xend=xend, yend=yend)) +
+ geom_segment(data = dendr_ends, aes(x=x, y=y.x, xend=xend, yend=yend, color = water_body)) + 
+ scale_color_manual(values = water_body_colors) +
+ scale_y_reverse() +
+ coord_flip() + 
+  theme_bw() + 
+  ylab("Distance")
 ```
 
