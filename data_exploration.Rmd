@@ -20,7 +20,7 @@ library(viridis)
 
 ```{r}
 # build RData file for starting files - files imported in from csv downloads
-save(sample_collection_metadata, water_NPOC_TDN, site_metadata,water_spectral_indices, file = "EC1_raw_data.RData")
+save(sample_collection_metadata, water_NPOC_TDN, site_metadata,water_spectral_indices, soil, file = "EC1_raw_data.RData")
 
 # load(EC1_raw_data.RData) will bring this into the environment!
 ```
@@ -32,7 +32,6 @@ save(sample_collection_metadata, water_NPOC_TDN, site_metadata,water_spectral_in
 water_sample_metadata <- sample_collection_metadata[, c(1:3)]
 water <- left_join(water_NPOC_TDN, water_sample_metadata, by = "kit_id")
 water <- left_join(water, site_metadata, by = "kit_id")
-water_map <- water[,c(3:5,6,9,10,14)]
 
 # add a new variable to look at the major water body where samples were taken, not just the region
 water <- water %>%
@@ -44,6 +43,8 @@ water <- water %>%
     kit_id == "K012" | kit_id == "K013" ~ "Lake Huron",
     kit_id == "K039" | kit_id == "K047" | kit_id == "K049" ~ "Lake Michigan"
   ))
+
+water_map <- water[,c(3:5,6,9,10,14,20)]
 
 # match up the spectral data with location of sites and DOC
 water_CDOM <- left_join(water, water_spectral_indices, by = c("kit_id", "campaign", "transect_location"))
@@ -59,9 +60,7 @@ water_CDOM_final <- water_CDOM_final[,c(3,5,6,9,10,13,14,20:31)]
 water_CDOM_missing <- water_CDOM %>%
   filter(is.na(SUVA254))
 
-water_CDOM_missing <- water_CDOM_missing[,3]
-
-water_CDOM_missing <- as.data.frame(water_CDOM_missing)
+water_CDOM_missing <- water_CDOM_missing[,c(3,20)]
 
 # remove kit 41 - can be replaced once that metadata is filled in
 water_CDOM_final <- water_CDOM_final[-18,]
@@ -80,7 +79,7 @@ library(rnaturalearthhires)
 # this package has important information about the US for drawing map boundaries
 ```
 
-## Making Maps
+## Making Maps of Water DOC
 
 ```{r}
 # pull info from rnaturalearth package to get world information
@@ -124,7 +123,14 @@ ggplot(data = gl) +
   labs(x = "Longitude", y = "Latitude", color = "NPOC (mg/L)")
 ```
 
-## Looking at Relationships between Different Spectral Indices
+```{r}
+# extra rough scatterplot to look if there are regional clusters in DOC concentrations for water
+ggplot(na.omit(water_map), aes(x = water_latitude, y = npoc_mgl, color = water_body)) +
+  geom_point() +
+  theme_bw()
+```
+
+## Looking at Relationships between Different CDOM Spectral Indices
 
 ```{r}
 # SUVA254 vs S350-400
@@ -223,7 +229,7 @@ ggplot(data = usa) +
   scale_color_viridis()
 ```
 
-## Trying an NMDS to Look at Similar Waters
+## Trying an NMDS to Look at Similar Water (in terms of CDOM metrics)
 
 ```{r}
 # https://jonlefcheck.net/2012/10/24/nmds-tutorial-in-r/
@@ -245,10 +251,11 @@ orditorp(site_NMDS, display = "species")
 orditorp(site_NMDS, display = "sites", cex = 1.25)
 ```
 
-## Cluster Analysis (for a better visual)
+## Cluster Analysis (for a better visual for CDOM metrics)
 
 ```{r}
 # http://www.sthda.com/english/wiki/beautiful-dendrogram-visualizations-in-r-5-must-known-methods-unsupervised-machine-learning
+# https://www.r-bloggers.com/2021/04/cluster-analysis-in-r/
 
 # compute Euclidean distance between samples
 water_dist <- dist(scale(water_pca), method = "euclidean")
@@ -298,5 +305,57 @@ ggplot() +
  coord_flip() + 
   theme_bw() + 
   ylab("Distance")
+```
+
+## Working with the Soil Data
+
+```{r}
+# remove all columns except metadata and TC data
+soil_edit <- soil[,c(2,3,6)]
+
+# prep water NPOC data for merging
+NPOC_data <- water_map[,c(1,3,5:8)]
+colnames(NPOC_data)[2] <- "water_npoc_mgl"
+
+# merge two dataframes
+water_soil_carbon <- left_join(NPOC_data, soil_edit, by = "kit_id")
+
+# set two columns in dataset to be factor variables
+water_soil_carbon$transect_location <- as.factor(water_soil_carbon$transect_location)
+water_soil_carbon$water_body <- as.factor(water_soil_carbon$water_body)
+```
+
+```{r}
+# plot overall relationship between soil and water carbon
+ggplot(na.omit(water_soil_carbon), aes(x = water_npoc_mgl, y = tc_perc, color = transect_location)) +
+  geom_point() +
+  facet_wrap(~transect_location, ncol = 2) +
+  theme_bw()
+```
+
+```{r}
+# loop to do three different sets of plots (for transect location) faceted by location of sample
+
+location_list <- c("Transition", "Upland", "Wetland") 
+plot_list = list()
+title_list <- c("Transition Soils", "Upland Soils", "Wetland Soils")
+
+for (n in 1:3) {
+  # will cycle through the loop one time for each site location
+  filtered_data <- water_soil_carbon %>%
+    filter(transect_location == location_list[n])
+  
+  # make a faceted plot
+  plot <- ggplot(na.omit(filtered_data), aes(x = water_npoc_mgl, y = tc_perc, color = water_body)) +
+  geom_point() +
+  facet_wrap(~water_body, ncol = 3) +
+  theme_bw() +
+  labs(title = title_list[n]) + stat_cor()
+  
+  # add the plot to the plot_list for viewing
+  plot_list[[n]] <- plot
+}
+
+print(plot_list)
 ```
 
