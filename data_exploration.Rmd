@@ -20,7 +20,7 @@ library(viridis)
 
 ```{r}
 # build RData file for starting files - files imported in from csv downloads
-save(sample_collection_metadata, water_NPOC_TDN, site_metadata,water_spectral_indices, soil, file = "EC1_raw_data.RData")
+save(sample_collection_metadata, water_NPOC_TDN, site_metadata, water_spectral_indices, soil, water_spectral_indices_part2, file = "EC1_raw_data.RData")
 
 # load(EC1_raw_data.RData) will bring this into the environment!
 ```
@@ -46,10 +46,23 @@ water <- water %>%
 
 water_map <- water[,c(3:5,6,9,10,14,20)]
 
-# match up the spectral data with location of sites and DOC
-water_CDOM <- left_join(water, water_spectral_indices, by = c("kit_id", "campaign", "transect_location"))
+# edit second CDOM dataset for better merging
+colnames(water_spectral_indices_part2)[1] <- "kit_id"
+water_spectral_indices_part2 <- water_spectral_indices_part2[,-2]
 
-# pull out the kits without CDOM data to remove NAs
+water_spectral_indices_part2$campaign <- "EC1"
+water_spectral_indices_part2$transect_location <- "water"
+
+# move columns around to match layout of first CDOM spreadsheet
+water_spectral_indices_part2 <- water_spectral_indices_part2[,c(13,1,14,2:12)]
+
+# bring in the second set of CDOM data
+water_spectral_indices_final <- rbind(water_spectral_indices, water_spectral_indices_part2)
+
+# match up the spectral data with location of sites and DOC
+water_CDOM <- left_join(water, water_spectral_indices_final, by = c("kit_id", "campaign", "transect_location"))
+
+# pull out the kits without CDOM data to remove NAs - should just be 2 now with updated data
 water_CDOM_final <- water_CDOM %>%
   filter(!is.na(SUVA254))
 
@@ -151,7 +164,7 @@ ggplot(water_CDOM_final, aes(x = S275_295, y = S350_400)) +
 ```{r}
 # building a correlation plot!
 # prepping data frame with just the variables for calculated correlations
-water_corr_plot <- water_CDOM_final[,c(2,7,8,10,12:17)]
+water_corr_plot <- water_CDOM_final[,c(9,10,12,14:19)]
 
 # load packages for visualization
 library(ggcorrplot)
@@ -320,9 +333,14 @@ colnames(NPOC_data)[2] <- "water_npoc_mgl"
 # merge two dataframes
 water_soil_carbon <- left_join(NPOC_data, soil_edit, by = "kit_id")
 
-# set two columns in dataset to be factor variables
+# set three columns in dataset to be factor variables
 water_soil_carbon$transect_location <- as.factor(water_soil_carbon$transect_location)
 water_soil_carbon$water_body <- as.factor(water_soil_carbon$water_body)
+water_soil_carbon$region <- as.factor(water_soil_carbon$region)
+
+# remove NA - should just be site 41 - step can be removed once metadata is replaced
+water_soil_carbon_noNA <- water_soil_carbon %>%
+  filter(!is.na(region))
 ```
 
 ```{r}
@@ -343,6 +361,47 @@ title_list <- c("Transition Soils", "Upland Soils", "Wetland Soils")
 for (n in 1:3) {
   # will cycle through the loop one time for each site location
   filtered_data <- water_soil_carbon %>%
+    filter(transect_location == location_list[n])
+  
+  # make a faceted plot
+  plot <- ggplot(na.omit(filtered_data), aes(x = water_npoc_mgl, y = tc_perc, color = water_body)) +
+  geom_point() +
+  facet_wrap(~water_body, ncol = 3) +
+  theme_bw() +
+  labs(title = title_list[n]) + stat_cor()
+  
+  # add the plot to the plot_list for viewing
+  plot_list[[n]] <- plot
+}
+
+print(plot_list)
+```
+
+```{r}
+# rerun the loop with all Great Lakes together to better look at correlations on plots
+
+# make copy of dataset so edits don't override existing dataframe
+water_soil_carbon_edit <- water_soil_carbon_noNA
+
+# add a new level to the water_body variable
+water_soil_carbon_edit$water_body <- factor(water_soil_carbon_edit$water_body, levels = c(levels(water_soil_carbon$water_body), "Great Lakes"))
+
+# edit water_body variable to merge the Great Lakes together
+for (n in 1:130) {
+  # check if row is in the Great Lakes region and transfer that to the water_body column if it's true
+  if (water_soil_carbon_edit$region[n] == "Great Lakes") {
+    water_soil_carbon_edit$water_body[n] <- "Great Lakes"
+  }
+}
+
+# plot loop
+location_list <- c("Transition", "Upland", "Wetland") 
+plot_list = list()
+title_list <- c("Transition Soils", "Upland Soils", "Wetland Soils")
+
+for (n in 1:3) {
+  # will cycle through the loop one time for each site location
+  filtered_data <- water_soil_carbon_edit %>%
     filter(transect_location == location_list[n])
   
   # make a faceted plot
