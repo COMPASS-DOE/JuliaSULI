@@ -348,7 +348,8 @@ water_soil_carbon_noNA <- water_soil_carbon %>%
 ggplot(na.omit(water_soil_carbon), aes(x = water_npoc_mgl, y = tc_perc, color = transect_location)) +
   geom_point() +
   facet_wrap(~transect_location, ncol = 2) +
-  theme_bw()
+  theme_bw() +
+  stat_cor()
 ```
 
 ```{r}
