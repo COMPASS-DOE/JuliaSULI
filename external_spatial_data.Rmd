@@ -1,0 +1,34 @@
+---
+title: " EXCHANGE Spatial Data Work"
+output: html_document
+date: "2022-10-21"
+---
+
+## Set-Up
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# load packages
+library(ggplot2)
+library(raster)
+library(sp)
+library(rgdal)
+```
+
+## Load in Land Cover
+
+```{r}
+# use raster package to interpret .img file
+NLCD <- raster("NLCD_2019_data/nlcd_2019_land_cover_l48_20210604.img")
+
+# plot(NLCD) is not working
+```
+
+## Load in Delaware Bay NHD Plus
+
+```{r}
+# look at the list of files in the geodatabase
+ogrListLayers("delaware_bay_NHD+.gdb")
+```
+
