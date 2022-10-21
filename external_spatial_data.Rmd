@@ -20,15 +20,16 @@ library(rgdal)
 
 ```{r}
 # use raster package to interpret .img file
-NLCD <- raster("NLCD_2019_data/nlcd_2019_land_cover_l48_20210604.img")
+NLCD <- raster::raster("NLCD_2019/NLCD_2019_Land_Cover_Science_Product_L48_20210604.img")
 
-# plot(NLCD) is not working
+# raster::plot(NLCD) is returning - "Error in setValues(outras, m) : values must be numeric, logical or factor"
 ```
 
 ## Load in Delaware Bay NHD Plus
 
 ```{r}
 # look at the list of files in the geodatabase
+# rdgal is the package needed for .gdb files
 ogrListLayers("delaware_bay_NHD+.gdb")
 ```
 
