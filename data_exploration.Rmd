@@ -20,31 +20,43 @@ library(viridis)
 
 ```{r}
 # build RData file for starting files - files imported in from csv downloads
-save(sample_collection_metadata, water_NPOC_TDN, site_metadata, water_spectral_indices, soil, water_spectral_indices_part2, file = "EC1_raw_data.RData")
+# save(sample_collection_metadata, water_NPOC_TDN, site_metadata, water_spectral_indices, soil, water_spectral_indices_part2, file = "EC1_raw_data.RData")
 
-# load(EC1_raw_data.RData) will bring this into the environment!
+load("EC1_raw_data.RData") 
+# brings RData files into the environment!
 ```
 
 ## Data Preparation
 
 ```{r}
 # simplify data frame to include coordinates and N/C metrics
-water_sample_metadata <- sample_collection_metadata[, c(1:3)]
+water_sample_metadata <- sample_collection_metadata[, c(1:3, 7)]
 water <- left_join(water_NPOC_TDN, water_sample_metadata, by = "kit_id")
 water <- left_join(water, site_metadata, by = "kit_id")
+
+# save a separate RData file for the site data!
+water_sites <- sample_collection_metadata[,c(1:3)]
+# save(water_sites, file = "water_collection_lat_long.RData")
 
 # add a new variable to look at the major water body where samples were taken, not just the region
 water <- water %>%
   mutate(water_body = case_when(
-    state == "OH" ~ "Lake Erie",
     state == "VA" | state == "MD" ~ "Chesapeake Bay",
     state == "DE" | state == "PA" | state == "NJ" ~ "Delaware Bay",
-    kit_id == "K019" | kit_id == "K020" | kit_id == "K033" ~ "Lake Superior",
-    kit_id == "K012" | kit_id == "K013" ~ "Lake Huron",
-    kit_id == "K039" | kit_id == "K047" | kit_id == "K049" ~ "Lake Michigan"
+    kit_id == "K019" | kit_id == "K020" | kit_id == "K033" | kit_id == "K012" | kit_id == "K013" | kit_id == "K039" | kit_id == "K047" | kit_id == "K049" | state == "OH" ~ "Great Lakes"
   ))
 
-water_map <- water[,c(3:5,6,9,10,14,20)]
+# edit a few rows of the water type column
+water$water_systemtype[11] <- "Tidal River/Estuary"
+water$water_systemtype[23] <- "Tidal River/Lacestuary"
+water$water_systemtype[43] <- "Tidal River"
+water$water_systemtype[45] <- "Tidal Stream"
+
+# set water type to factor variable
+water$water_systemtype <- as.factor(water$water_systemtype)
+
+# cut the dataset to the columns needed to make a map
+water_map <- water[,c(3,5,6,9,10,11,15,21)]
 
 # edit second CDOM dataset for better merging
 colnames(water_spectral_indices_part2)[1] <- "kit_id"
@@ -52,9 +64,6 @@ water_spectral_indices_part2 <- water_spectral_indices_part2[,-2]
 
 water_spectral_indices_part2$campaign <- "EC1"
 water_spectral_indices_part2$transect_location <- "water"
-
-# move columns around to match layout of first CDOM spreadsheet
-water_spectral_indices_part2 <- water_spectral_indices_part2[,c(13,1,14,2:12)]
 
 # bring in the second set of CDOM data
 water_spectral_indices_final <- rbind(water_spectral_indices, water_spectral_indices_part2)
@@ -67,16 +76,16 @@ water_CDOM_final <- water_CDOM %>%
   filter(!is.na(SUVA254))
 
 # remove additional columns for dataset ready for analysis
-water_CDOM_final <- water_CDOM_final[,c(3,5,6,9,10,13,14,20:31)]
+water_CDOM_final <- water_CDOM_final[,c(3,5,6,9:11,14,15,21:23,25,27:32)]
 
 # make a list of the sites missing CDOM data
 water_CDOM_missing <- water_CDOM %>%
   filter(is.na(SUVA254))
 
-water_CDOM_missing <- water_CDOM_missing[,c(3,20)]
+water_CDOM_missing <- water_CDOM_missing[,c(3,21)]
 
 # remove kit 41 - can be replaced once that metadata is filled in
-water_CDOM_final <- water_CDOM_final[-18,]
+water_CDOM_final <- water_CDOM_final[-30,]
 ```
 
 ## Load In More Packages for Mapping
@@ -98,9 +107,10 @@ library(rnaturalearthhires)
 # pull info from rnaturalearth package to get world information
 usa <- ne_states(country = "United States of America", returnclass = "sf")
 gl <- ne_states(country = c("United States of America", "Canada"), returnclass = "sf")
-lakes <- rnaturalearth::ne_download(scale = 10, type = 'lakes', category = 'physical', returnclass = "sf")
 
+#lakes <- rnaturalearth::ne_download(scale = 10, type = 'lakes', category = 'physical', returnclass = "sf")
 # getting error message here to get more detail map attributes - address later!!
+# https://www.naturalearthdata.com/downloads/10m-physical-vectors/ <- website for data downloads
 
 # all water sampling locations plotted!
 ggplot(data = usa) +
@@ -164,7 +174,7 @@ ggplot(water_CDOM_final, aes(x = S275_295, y = S350_400)) +
 ```{r}
 # building a correlation plot!
 # prepping data frame with just the variables for calculated correlations
-water_corr_plot <- water_CDOM_final[,c(9,10,12,14:19)]
+water_corr_plot <- water_CDOM_final[,c(10:18)]
 
 # load packages for visualization
 library(ggcorrplot)
@@ -189,7 +199,7 @@ ggcorrplot(water_corr_matrix, hc.order = TRUE,
 ```{r}
 # https://www.statology.org/principal-components-analysis-in-r/
 # set up data frame
-water_pca <- water_CDOM_final[,c(9,10,12,14:19)]
+water_pca <- water_CDOM_final[,c(10:18)]
 
 # pull kit IDs to change the row names for labels on the PCA plot
 kit_id <- water_CDOM_final[,1]
@@ -226,6 +236,12 @@ library(ggfortify) #ggfortify allows ggplot to work with PCA data
 autoplot(pc, data = water_CDOM_final, colour = 'water_body', size = 3, loadings = TRUE,
          loadings.colour = 'black', loadings.label = TRUE) +
   theme_bw()
+
+# plot PCA again using water_systemtype
+autoplot(pc, data = water_CDOM_final, colour = 'water_systemtype', size = 3, loadings = TRUE,
+         loadings.colour = 'black', loadings.label = TRUE) +
+  theme_bw()
+
 ```
 
 ```{r}
@@ -307,7 +323,7 @@ dendr_ends <- dendr_segments %>%
   left_join(water_CDOM_final, by = "kit_id")
 
 # create vector of colors for the different regions
-water_body_colors <- c("Chesapeake Bay" = "red" , "Delaware Bay" = "orange", "Lake Erie" = "green", "Lake Huron" = "blue", "Lake Michigan" = "purple", "Lake Superior" = "black")
+water_body_colors <- c("Chesapeake Bay" = "red" , "Delaware Bay" = "dark green", "Great Lakes" = "blue")
 
 # plot the dendrogram
 ggplot() +
@@ -327,7 +343,7 @@ ggplot() +
 soil_edit <- soil[,c(2,3,6)]
 
 # prep water NPOC data for merging
-NPOC_data <- water_map[,c(1,3,5:8)]
+NPOC_data <- water_map[,c(1,2,4:8)]
 colnames(NPOC_data)[2] <- "water_npoc_mgl"
 
 # merge two dataframes
@@ -367,7 +383,6 @@ for (n in 1:3) {
   # make a faceted plot
   plot <- ggplot(na.omit(filtered_data), aes(x = water_npoc_mgl, y = tc_perc, color = water_body)) +
   geom_point() +
-  facet_wrap(~water_body, ncol = 3) +
   theme_bw() +
   labs(title = title_list[n]) + stat_cor()
   
@@ -379,43 +394,79 @@ print(plot_list)
 ```
 
 ```{r}
-# rerun the loop with all Great Lakes together to better look at correlations on plots
+# new plots looking at water_systemtype
 
-# make copy of dataset so edits don't override existing dataframe
-water_soil_carbon_edit <- water_soil_carbon_noNA
-
-# add a new level to the water_body variable
-water_soil_carbon_edit$water_body <- factor(water_soil_carbon_edit$water_body, levels = c(levels(water_soil_carbon$water_body), "Great Lakes"))
-
-# edit water_body variable to merge the Great Lakes together
-for (n in 1:130) {
-  # check if row is in the Great Lakes region and transfer that to the water_body column if it's true
-  if (water_soil_carbon_edit$region[n] == "Great Lakes") {
-    water_soil_carbon_edit$water_body[n] <- "Great Lakes"
-  }
-}
-
-# plot loop
-location_list <- c("Transition", "Upland", "Wetland") 
-plot_list = list()
-title_list <- c("Transition Soils", "Upland Soils", "Wetland Soils")
+second_plot_list = list()
 
 for (n in 1:3) {
   # will cycle through the loop one time for each site location
-  filtered_data <- water_soil_carbon_edit %>%
+  filtered_data <- water_soil_carbon %>%
     filter(transect_location == location_list[n])
   
   # make a faceted plot
-  plot <- ggplot(na.omit(filtered_data), aes(x = water_npoc_mgl, y = tc_perc, color = water_body)) +
+  plot <- ggplot(na.omit(filtered_data), aes(x = water_npoc_mgl, y = tc_perc, color = water_systemtype)) +
   geom_point() +
-  facet_wrap(~water_body, ncol = 3) +
+  facet_wrap(~water_systemtype, ncol = 4) +
   theme_bw() +
   labs(title = title_list[n]) + stat_cor()
   
   # add the plot to the plot_list for viewing
-  plot_list[[n]] <- plot
+second_plot_list[[n]] <- plot
 }
 
-print(plot_list)
+print(second_plot_list)
+```
+
+## Thinking through Set of Soil Extractions
+
+```{r}
+# group the soil samples by Kit ID and then count how many per kit
+site_summary <- water_soil_carbon_noNA %>%
+  group_by(kit_id, water_npoc_mgl, water_latitude, water_longitude, region, water_systemtype, water_body) %>%
+  summarize(soil_samples = n())
+
+# add the total number of soil samples -> should return 130 total
+sum(site_summary$soil_samples)
+
+# filter out sites that don't have all samples to get a list of the ones I want to pick from
+target_sites <- site_summary %>%
+  filter(soil_samples == 3)
+
+# and filter out the sites with high NPOC
+target_sites_filtered <- target_sites %>%
+  filter(water_npoc_mgl < 25)
+
+# bring salinity data in!
+water_quality_crop <- water_quality[, c(2,4)]
+target_sites_filtered <- left_join(target_sites_filtered, water_quality_crop, by = "kit_id")
+
+# map target sites to get a feel for spatial layout
+# chesapeake region
+ggplot(data = usa) +
+  geom_sf() +
+  coord_sf(xlim = c(-77.5,-74.5), ylim = c(37.2,40)) +
+  geom_point(data = target_sites_filtered, mapping = aes(x = water_longitude, y = water_latitude, color = water_systemtype)) +
+  theme_bw() +
+  labs(x = "Longitude", y = "Latitude")
+
+# chesapeake with a salinity gradient
+ggplot(data = usa) +
+  geom_sf() +
+  coord_sf(xlim = c(-77.5,-74.5), ylim = c(37.2,40)) +
+  geom_point(data = target_sites_filtered, mapping = aes(x = water_longitude, y = water_latitude, color = sal_psu)) +
+  theme_bw() +
+  labs(x = "Longitude", y = "Latitude")
+
+# GL region
+ggplot(data = gl) +
+  geom_sf() +
+  coord_sf(xlim = c(-92,-82), ylim = c(40,48)) +
+  geom_point(data = target_sites_filtered, mapping = aes(x = water_longitude, y = water_latitude, color = water_systemtype)) +
+  theme_bw() +
+  labs(x = "Longitude", y = "Latitude")
+
+# MY SITES
+
+
 ```
 
