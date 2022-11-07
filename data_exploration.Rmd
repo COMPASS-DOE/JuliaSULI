@@ -350,13 +350,15 @@ colnames(NPOC_data)[2] <- "water_npoc_mgl"
 water_soil_carbon <- left_join(NPOC_data, soil_edit, by = "kit_id")
 
 # set three columns in dataset to be factor variables
-water_soil_carbon$transect_location <- as.factor(water_soil_carbon$transect_location)
+water_soil_carbon$transect_location <- factor(water_soil_carbon$transect_location, levels = c("Wetland", "Transition", "Upland"))
 water_soil_carbon$water_body <- as.factor(water_soil_carbon$water_body)
 water_soil_carbon$region <- as.factor(water_soil_carbon$region)
 
 # remove NA - should just be site 41 - step can be removed once metadata is replaced
+# 57 and 60 have no soil samples
 water_soil_carbon_noNA <- water_soil_carbon %>%
-  filter(!is.na(region))
+  filter(!is.na(region)) %>%
+  filter(!is.na(tc_perc))
 ```
 
 ```{r}
@@ -417,6 +419,19 @@ second_plot_list[[n]] <- plot
 print(second_plot_list)
 ```
 
+```{r}
+# boxplot of the soil carbon percentages by transect location
+ggplot(water_soil_carbon_noNA, aes(x=water_body, y = tc_perc, fill = transect_location)) +
+  geom_boxplot() +
+  theme_bw()
+
+# separate out the water system type
+ggplot(water_soil_carbon_noNA, aes(x=water_body, y = tc_perc, fill = transect_location)) +
+  geom_boxplot() +
+  theme_bw() +
+  facet_wrap(~ water_systemtype)
+```
+
 ## Thinking through Set of Soil Extractions
 
 ```{r}
@@ -464,9 +479,48 @@ ggplot(data = gl) +
   geom_point(data = target_sites_filtered, mapping = aes(x = water_longitude, y = water_latitude, color = water_systemtype)) +
   theme_bw() +
   labs(x = "Longitude", y = "Latitude")
+```
 
-# MY SITES
+```{r}
+# pull out selected sites for a general map
 
+extract_sites <- water_soil_carbon_noNA %>%
+  filter(kit_id == "K019" |
+           kit_id == "K013" |
+           kit_id == "K010" |
+           kit_id == "K050" |
+           kit_id == "K061" |
+           kit_id == "K048" |
+           kit_id == "K026" |
+           kit_id == "K018" |
+           kit_id == "K035" |
+           kit_id == "K025")
 
+# make a map of sites
+# use gl data created earlier in script to get border for Great Lakes better
+ggplot(data = gl) +
+  geom_sf() +
+  coord_sf(xlim = c(-92,-75), ylim = c(37,47)) +
+  geom_point(data = extract_sites, mapping = aes(x = water_longitude, y = water_latitude, label = kit_id), color = "dark blue") +
+  theme_bw() +
+  labs(x = "Longitude", y = "Latitude")
+
+# zoom in for Mid-Atlantic region
+ggplot(data = usa) +
+  geom_sf() +
+  coord_sf(xlim = c(-77.5,-74.5), ylim = c(37.2,40)) +
+  geom_point(data = extract_sites, mapping = aes(x = water_longitude, y = water_latitude)) +
+  theme_bw() +
+  labs(x = "Longitude", y = "Latitude")
+
+# make easy reference data frames for TC
+sites_upland <- extract_sites %>%
+  filter(transect_location == "Upland")
+
+sites_transition <- extract_sites %>%
+  filter(transect_location == "Transition")
+
+sites_wetland <- extract_sites %>%
+  filter(transect_location == "Wetland")
 ```
 
