@@ -10,10 +10,6 @@
 # #############
 # #############
 
-### QUESTION for team: We are setting blanks to 0 when the blank is less than LOD
-### Does that make sense? Setting blanks to 0 when they are not? 
-
-
 # 1. Setup ---------------------------------------------------------------------
 
 # load packages
@@ -28,8 +24,8 @@ theme_set(theme_bw())
 
 ## Set LOD (for all data after 10/11/2021)
 ## If any data were before 10/11/21, lod_npoc = 0.27, lod_tdn = 0.070
-#lod_npoc <- 0.076
-#lod_tdn <- 0.014
+lod_npoc <- 0.076
+lod_tdn <- 0.014
 
 ## Set GitHub repository folder for raw data files
 directory = "./Raw NPOC Data"
@@ -73,23 +69,45 @@ npoc_raw <- files %>%
   filter(grepl("EC1", sample_name)) %>% 
   bind_rows()
 
+## Read in ReadMes, filter to EC1 samples only
+readmes_all <- ReadMes %>% 
+  map_df(read_mes) %>% 
+  filter(grepl("EC1", sample_name)) %>%
+  bind_rows() 
+
+# 4. Work with Duplicate NPOC Values -------------------------------------------
+
+## Replace values over cal curve with the rerun NPOC values and the dilution factors
 # make the date column numerical
 npoc_raw$date <- as.numeric(npoc_raw$date)
+readmes_all$date <- as.numeric(readmes_all$date)
 
 # mark rows that are duplicates
 npoc_raw$dups <- duplicated(npoc_raw$sample_name)
+readmes_all$dups <- duplicated(npoc_raw$sample_name)
 
-## replace values over cal curve with the rerun NPOC values
 # filter out the duplicate rows into another data frame
 npoc_raw_dups <- npoc_raw %>%
   filter(dups == TRUE)
+readmes_all_dups <- readmes_all %>%
+  filter(dups == TRUE)
+
+# combine the duplicate data frames
+npoc_raw_dups <- left_join(npoc_raw_dups, readmes_all_dups, by = c("sample_name", "date", "dups"))
 
 # make a dataset without the duplicates
 npoc_raw_noduplicates <- npoc_raw %>%
   filter(dups == FALSE)
+readmes_all_noduplicates <- readmes_all %>%
+  filter(dups == FALSE)
 
 # make a dataset to show the replacements
 npoc_raw_replaced <- npoc_raw_noduplicates
+readmes_all_dilution_replaced <- readmes_all_noduplicates
+
+# edit date column to have a date for NPOC measurement and one for TDN
+npoc_raw_replaced$npoc_date <- npoc_raw_replaced$date
+colnames(npoc_raw_replaced)[4] <- "tdn_date"
 
 # loop through the rows needing replacement, check conditions, and replace values
 for (n in 1:nrow(npoc_raw_dups)) {
@@ -100,40 +118,77 @@ for (n in 1:nrow(npoc_raw_dups)) {
      
      # check if the date of the duplicates is greater than the date of the original data 
      # assumption here that rerun data will be more recent and will be the desired values to process (because they were rerun for a reason)
-     if (npoc_raw_dups$date[n] > npoc_raw_replaced$date[i]) {
+     if (npoc_raw_dups$date[n] > npoc_raw_replaced$npoc_date[i]) {
        
        # replace values
        npoc_raw_replaced$npoc_raw[i] <- npoc_raw_dups$npoc_raw[n]
        
        # replace the date of measurement
-       npoc_raw_replaced$date[i] <- npoc_raw_dups$date[n]
+       npoc_raw_replaced$npoc_date[i] <- npoc_raw_dups$date[n]
      }
    }
   }
 }
 
-# 4. Calculate blanks and add to data ------------------------------------------
+# edit dilution column to have one factor for TDN and one for NPOC
+readmes_all_dilution_replaced$npoc_dilution <- readmes_all_dilution_replaced$Dilution
+colnames(readmes_all_dilution_replaced)[3] <- "tdn_dilution"
 
-blanks <- npoc_raw %>% 
-  filter(grepl("^Blank", sample_name)) %>% 
-  group_by(date) %>% 
-  summarize(npoc_blank_raw = round(mean(npoc_raw[!is.na(npoc_raw)]), 2), 
+# same loop, but for dilution factors
+for (n in 1:nrow(npoc_raw_dups)) {
+  
+  # find the rows in the original dataset that match names needing to be replaced
+  for (i in 1:nrow(readmes_all_dilution_replaced)) {
+    if (readmes_all_dilution_replaced$sample_name[i] == npoc_raw_dups$sample_name[n]) {
+      
+      # check if the date of the duplicates is greater than the date of the 
+      # original data 
+      # assumption here that rerun data will be more recent and will be the 
+      # desired values to process (because they were rerun for a reason)
+      if (npoc_raw_dups$date[n] > readmes_all_dilution_replaced$date[i]) {
+        
+        # replace values
+        readmes_all_dilution_replaced$npoc_dilution[i] <- npoc_raw_dups$Dilution[n]
+        
+        # replace the date of measurement
+        readmes_all_dilution_replaced$date[i] <- npoc_raw_dups$date[n]
+      }
+    }
+  }
+}
+
+# 5. Calculate process blanks --------------------------------------------------
+
+# pull process blanks out of dataset
+# calculate NPOC average and TDN if undiluted
+# make sure blanks are either 0 or higher than instrument LOD
+blanks <- npoc_raw_replaced %>% 
+  filter(grepl("blank-filter", sample_name)) %>% 
+  group_by(npoc_date, tdn_date) %>%
+  summarize(npoc_blank_raw = round(mean(npoc_raw[!is.na(npoc_raw)]), 2),
             tdn_blank_raw = round(mean(tdn_raw[!is.na(tdn_raw)]), 2)) %>% 
-  mutate(npoc_blank = ifelse(npoc_blank_raw > lod_npoc, npoc_blank_raw, 0), 
+  mutate(npoc_blank = ifelse(npoc_blank_raw > lod_npoc, npoc_blank_raw, 0),
          tdn_blank = ifelse(tdn_blank_raw > lod_tdn, tdn_blank_raw, 0)) %>% 
-  select(date, npoc_blank, tdn_blank)
+  select(npoc_date, npoc_blank, tdn_date, tdn_blank)
 
+# 6. Blank Correction ----------------------------------------------------------
 
-# 5. Add blanks data -----------------------------------------------------------
-
-npoc_blank_corrected <- npoc_raw %>% 
+npoc_blank_corrected <- npoc_raw_replaced %>% 
   filter(grepl("EC1_K", sample_name)) %>% # filter to EC1 samples only
   mutate(campaign = "EC1", 
          kit_id = substr(sample_name, 5, 9), 
-         transect_location = "water") %>% 
-  inner_join(blanks, by = "date") %>% 
+         transect_location = case_when(
+           substr(sample_name, 10, 11) == "UP" ~ "Upland",
+           substr(sample_name, 10, 10) == "T" ~ "Transition",
+           substr(sample_name, 10, 10)  == "W" ~ "Wetland"
+         )) %>% 
+  inner_join(blanks, by = "tdn_date") %>% 
   mutate(npoc_mgl = npoc_raw - npoc_blank, 
          tdn_mgl = tdn_raw - tdn_blank)
+
+# 7. Dilution Correction -------------------------------------------------------
+
+
 
 
 # 6. Clean data ----------------------------------------------------------------
