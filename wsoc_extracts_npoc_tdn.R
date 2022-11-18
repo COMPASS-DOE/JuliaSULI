@@ -171,55 +171,53 @@ blanks <- npoc_raw_replaced %>%
          tdn_blank = ifelse(tdn_blank_raw > lod_tdn, tdn_blank_raw, 0)) %>% 
   select(npoc_date, npoc_blank, tdn_date, tdn_blank)
 
+colnames(blanks)[1] <- "npoc_blank_date"
+
 # 6. Blank Correction ----------------------------------------------------------
 
 npoc_blank_corrected <- npoc_raw_replaced %>% 
   filter(grepl("EC1_K", sample_name)) %>% # filter to EC1 samples only
   mutate(campaign = "EC1", 
-         kit_id = substr(sample_name, 5, 9), 
+         kit_id = substr(sample_name, 5, 8), 
          transect_location = case_when(
            substr(sample_name, 10, 11) == "UP" ~ "Upland",
            substr(sample_name, 10, 10) == "T" ~ "Transition",
-           substr(sample_name, 10, 10)  == "W" ~ "Wetland"
-         )) %>% 
+           substr(sample_name, 10, 10)  == "W" ~ "Wetland")) %>% 
   inner_join(blanks, by = "tdn_date") %>% 
-  mutate(npoc_mgl = npoc_raw - npoc_blank, 
-         tdn_mgl = tdn_raw - tdn_blank)
+  mutate(npoc_bc = npoc_raw - npoc_blank, 
+         tdn_bc = tdn_raw - tdn_blank)
+
+# add blank-sol and blank-filter values back in for CDOM normalizations
+npoc_blank_corrected <- bind_rows(npoc_blank_corrected, 
+                              filter(npoc_raw_replaced, 
+                                     grepl("EC1_b", sample_name)))
+
 
 # 7. Dilution Correction -------------------------------------------------------
 
+colnames(readmes_all_dilution_replaced)[4] <- "npoc_date"
 
+samples_dilution_corrected <- npoc_blank_corrected %>%
+  left_join(readmes_all_dilution_replaced, by = c("sample_name", "npoc_date", "dups")) %>% 
+  mutate(npoc_mgl = ifelse(!is.na(npoc_bc), npoc_bc * npoc_dilution,
+                           npoc_raw * npoc_dilution),
+         tdn_mgl = ifelse(!is.na(tdn_bc), tdn_bc * tdn_dilution, 
+                          tdn_raw * tdn_dilution), 
+         npoc_mgl = as.numeric(npoc_mgl), npoc_mgl = round(npoc_mgl, 2),
+         tdn_mgl= as.numeric(tdn_mgl), tdn_mgl= round(tdn_mgl, 2))
 
+# 8. Final Dataset Prep --------------------------------------------------------
 
-# 6. Clean data ----------------------------------------------------------------
+# overwrite blank-sol TN values because they were diluted MQ which doesn't make sense
+# values won't be used in analysis anyways
+samples_dilution_corrected[c(35,37,39), "tdn_mgl"] <- 9999999
 
-## Helper function to calculate mean if numeric, otherwise first (needed to 
-## preserve dates, which are different for duplicated kits)
-mean_if_numeric <- function(x){
-  ifelse(is.numeric(x), mean(x, na.rm = TRUE), first(x))
-}
+# select desired columns
+wsoc <- samples_dilution_corrected %>%
+  select(sample_name, tdn_date, npoc_date, campaign, kit_id, transect_location, 
+         npoc_mgl, tdn_mgl)
 
-## Another step before finalizing is taking care of pesky duplicates from reruns
-npoc_duplicates_removed <- npoc_blank_corrected %>% 
-  select(campaign, transect_location, kit_id, date, npoc_mgl, tdn_mgl, npoc_blank, tdn_blank) %>% 
-  group_by(kit_id) %>% 
-  summarize(across(everything(), .f = mean_if_numeric))
+# 9. Write out data ----------------------------------------------------------------
+date_updated <- "20221118"
 
-## The last step is flagging data
-npoc_raw_flags <- npoc_duplicates_removed %>% 
-  ## First, round each parameter to proper significant figures
-  mutate(npoc_mgl = round(npoc_mgl, 2), 
-         tdn_mgl = round(tdn_mgl, 3)) %>% 
-  ## Second, add flags for outside LOD
-  mutate(npoc_flag = ifelse(npoc_mgl < lod_npoc | npoc_mgl > 30, "npoc outside range", NA), #per cal curve upper limit
-         tdn_flag = ifelse(tdn_mgl < lod_tdn | tdn_mgl > 3, "tdn outside range", NA))
-
-npoc <- npoc_raw_flags %>% 
-  select(date, campaign, kit_id, transect_location, npoc_mgl, tdn_mgl, contains("_flag"))
-
-
-# 7. Write data ----------------------------------------------------------------
-date_updated <- "20220601"
-
-write_csv(npoc, paste0("Data/Processed/EC1_Water_NPOC_TDN_L0B_", date_updated, ".csv"))
-
+write_csv(wsoc, paste0("./Processed Data/EC1_WSOC_Extracts_NPOC_TDN_L0B_", date_updated, ".csv"))
