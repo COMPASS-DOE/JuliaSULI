@@ -1,0 +1,78 @@
+[Header]	
+System	9 mL TOC-L with TNM	
+S/W Version	1.00	
+User		
+Date/Time	11/17/2022 1:37:36 PM	
+
+[System]	
+Instrument Options	TOC/ASI/IC Unit/TN/Sparge Kit/	
+
+[Data]	
+Type	Anal.	Sample Name	Sample ID	Result(TOC)	Result(TC)	Result(IC)	Result(POC)	Result(NPOC)	Result(TN)	Unit	Vial	Date / Time	
+Unknown	NPOC/TN	CondBlank1	Untitled					0.000	0.000	mg/L	1	11/7/2022 4:15:25 PM	
+Unknown	NPOC/TN	CondBlank2	Untitled					0.000	0.000	mg/L	2	11/7/2022 4:39:16 PM	
+Unknown	NPOC/TN	CondBlank3	Untitled					0.000	0.000	mg/L	3	11/7/2022 4:56:41 PM	
+Standard	NPOC	STD_0-100ppmNPOC	Untitled					100.0		mg/L	4, 5, 6, 7, 8, 9, 10, 11, 12, 13	11/7/2022 8:07:22 PM	
+Standard	TN	STD_0-3ppmTN	Untitled						3.000	mg/L	14, 15, 16, 17, 18, 19, 20, 21	11/7/2022 10:36:46 PM	
+Unknown	NPOC/TN	Blank1	Untitled					0.3491	0.02590	mg/L	22	11/7/2022 10:54:49 PM	
+Unknown	NPOC/TN	CKSTD1_1ppmCN	Untitled					1.292	1.018	mg/L	23	11/7/2022 11:15:14 PM	
+Unknown	NPOC/TN	EC1_K010_UP	Untitled					71.48	7.251	mg/L	24	11/7/2022 11:40:21 PM	
+Unknown	NPOC/TN	EC1_K013_UP	Untitled					49.56	5.581	mg/L	25	11/7/2022 11:59:05 PM	
+Unknown	NPOC/TN	EC1_K018_UP	Untitled					189.2	22.72	mg/L	26	11/8/2022 12:25:27 AM	
+Unknown	NPOC/TN	EC1_K019_UP	Untitled					135.4	11.15	mg/L	27	11/8/2022 12:45:48 AM	
+Unknown	NPOC/TN	EC1_K025_UP	Untitled					173.9	7.205	mg/L	28	11/8/2022 1:05:58 AM	
+Unknown	NPOC/TN	EC1_K026_UP	Untitled					17.99	3.673	mg/L	29	11/8/2022 1:28:37 AM	
+Unknown	NPOC/TN	EC1_K035_UP	Untitled					65.55	4.927	mg/L	30	11/8/2022 1:47:35 AM	
+Unknown	NPOC/TN	EC1_K048_UP	Untitled					79.19	7.518	mg/L	31	11/8/2022 2:06:48 AM	
+Unknown	NPOC/TN	EC1_K050_UP	Untitled					521.0	23.42	mg/L	32	11/8/2022 2:28:30 AM	
+Unknown	NPOC/TN	EC1_K061_UP	Untitled					36.63	4.075	mg/L	33	11/8/2022 2:47:27 AM	
+Unknown	NPOC/TN	Blank2	Untitled					1.171	0.06718	mg/L	34	11/8/2022 3:06:44 AM	
+Unknown	NPOC/TN	CKSTD2_1ppmCN	Untitled					1.545	0.9987	mg/L	35	11/8/2022 3:27:39 AM	
+Unknown	NPOC/TN	EC1_K035_UP_rep	Untitled					65.34	4.684	mg/L	36	11/8/2022 3:46:32 AM	
+Unknown	NPOC/TN	EC1_blank-filter1	Untitled					1.368	0.09192	mg/L	37	11/8/2022 4:06:05 AM	
+Unknown	NPOC/TN	EC1_blank-sol1	Untitled					0.6235	0.05988	mg/L	38	11/8/2022 4:23:59 AM	
+Unknown	NPOC/TN	EC1_K010_T	Untitled					46.78	4.318	mg/L	39	11/8/2022 4:46:29 AM	
+Unknown	NPOC/TN	EC1_K013_T	Untitled					119.2	10.89	mg/L	40	11/8/2022 5:06:07 AM	
+Unknown	NPOC/TN	EC1_K018_T	Untitled					41.63	5.390	mg/L	41	11/8/2022 5:29:28 AM	
+Unknown	NPOC/TN	EC1_K019_T	Untitled					19.20	1.325	mg/L	42	11/8/2022 5:52:26 AM	
+Unknown	NPOC/TN	EC1_K025_T	Untitled					98.35	6.921	mg/L	43	11/8/2022 6:12:42 AM	
+Unknown	NPOC/TN	EC1_K026_T	Untitled					166.0	14.52	mg/L	44	11/8/2022 6:33:32 AM	
+Unknown	NPOC/TN	EC1_K035_T	Untitled					153.1	14.73	mg/L	45	11/8/2022 6:58:32 AM	
+Unknown	NPOC/TN	Blank3	Untitled					0.7768	0.05009	mg/L	46	11/8/2022 7:17:45 AM	
+Unknown	NPOC/TN	CKSTD3_1ppmCN	Untitled					1.339	0.9425	mg/L	47	11/8/2022 7:40:15 AM	
+Unknown	NPOC/TN	EC1_K048_T	Untitled					64.60	6.292	mg/L	48	11/8/2022 7:59:48 AM	
+Unknown	NPOC/TN	EC1_K050_T	Untitled					26.66	2.042	mg/L	49	11/8/2022 8:25:16 AM	
+Unknown	NPOC/TN	EC1_K061_T	Untitled					23.86	2.481	mg/L	50	11/8/2022 8:43:36 AM	
+Unknown	NPOC/TN	EC1_K018_T_rep	Untitled					42.91	5.534	mg/L	51	11/8/2022 9:07:13 AM	
+Unknown	NPOC/TN	EC1_blank-filter2	Untitled					1.552	0.1158	mg/L	52	11/8/2022 9:29:57 AM	
+Unknown	NPOC/TN	EC1_blank-sol2	Untitled					0.5708	0.02526	mg/L	53	11/8/2022 9:52:26 AM	
+Unknown	NPOC/TN	EC1_K010_W	Untitled					75.03	6.420	mg/L	54	11/8/2022 10:11:19 AM	
+Unknown	NPOC/TN	EC1_K013_W	Untitled					238.2	19.22	mg/L	55	11/8/2022 10:36:19 AM	
+Unknown	NPOC/TN	EC1_K018_W	Untitled					22.28	2.446	mg/L	56	11/8/2022 10:58:32 AM	
+Unknown	NPOC/TN	EC1_K019_W	Untitled					9.004	0.7446	mg/L	57	11/8/2022 11:16:12 AM	
+Unknown	NPOC/TN	Blank4	Untitled					0.7333	0.07903	mg/L	58	11/8/2022 11:36:12 AM	
+Unknown	NPOC/TN	CKSTD4_1ppmCN	Untitled					1.381	0.9746	mg/L	59	11/8/2022 11:56:45 AM	
+Unknown	NPOC/TN	EC1_K025_W	Untitled					48.78	3.873	mg/L	60	11/8/2022 12:16:26 PM	
+Unknown	NPOC/TN	EC1_K026_W	Untitled					46.08	4.880	mg/L	61	11/8/2022 12:35:52 PM	
+Unknown	NPOC/TN	EC1_K035_W	Untitled					384.1	28.63	mg/L	62	11/8/2022 1:03:13 PM	
+Unknown	NPOC/TN	EC1_K048_W	Untitled					71.82	6.162	mg/L	63	11/8/2022 1:26:27 PM	
+Unknown	NPOC/TN	EC1_K050_W	Untitled					144.5	9.547	mg/L	64	11/8/2022 1:50:24 PM	
+Unknown	NPOC/TN	EC1_K061_W	Untitled					71.55	6.723	mg/L	65	11/8/2022 2:10:21 PM	
+Unknown	NPOC/TN	EC1_K026_W_rep	Untitled					47.66	5.050	mg/L	66	11/8/2022 2:29:18 PM	
+Unknown	NPOC/TN	EC1_blank-filter3	Untitled					2.176	0.1635	mg/L	67	11/8/2022 2:48:52 PM	
+Unknown	NPOC/TN	EC1_blank-sol3	Untitled					0.7101	0.05716	mg/L	68	11/8/2022 3:07:10 PM	
+Unknown	NPOC/TN	Blank5	Untitled					0.6814	0.05626	mg/L	69	11/8/2022 3:25:51 PM	
+Unknown	NPOC/TN	CKSTD5_1ppmCN	Untitled					1.527	0.9508	mg/L	70	11/8/2022 3:47:16 PM	
+Unknown	NPOC/TN	CondBlank1	Untitled					0.4412	0.04159	mg/L	71	11/8/2022 5:10:34 PM	
+Unknown	NPOC/TN	CondBlank2	Untitled					0.4084	0.03277	mg/L	72	11/8/2022 5:28:53 PM	
+Unknown	NPOC/TN	CondBlank3	Untitled					0.4349	0.05049	mg/L	73	11/8/2022 5:48:32 PM	
+Standard	TN	STD_0-35ppmTN	Untitled						35.00	mg/L	74, 75, 76, 77, 78, 79, 80, 81	11/8/2022 8:06:12 PM	
+Unknown	NPOC/TN	Blank6	Untitled					0.4148	0.3345	mg/L	82	11/8/2022 8:26:29 PM	
+Unknown	NPOC/TN	Blank7	Untitled					0.4908	0.2596	mg/L	83	11/8/2022 8:46:01 PM	
+Unknown	NPOC/TN	CKSTD6_1ppmCN	Untitled					1.158	1.149	mg/L	84	11/8/2022 9:09:53 PM	
+Unknown	NPOC/TN	Blank8	Untitled					0.4883	0.2615	mg/L	85	11/8/2022 9:28:40 PM	
+Unknown	NPOC/TN	Blank9	Untitled					0.4786	0.2221	mg/L	86	11/8/2022 9:43:47 PM	
+Unknown	NPOC/TN	Blank10	Untitled					0.4011	0.2338	mg/L	87	11/8/2022 9:59:44 PM	
+Unknown	NPOC/TN	Blank11	Untitled					0.4045	0.2256	mg/L	88	11/8/2022 10:21:39 PM	
+Unknown	NPOC/TN	Blank12	Untitled					0.3948	0.2366	mg/L	89	11/8/2022 10:44:26 PM	
+Unknown	NPOC/TN	Blank13	Untitled					0.5035	0.2209	mg/L	90	11/8/2022 11:02:13 PM	
