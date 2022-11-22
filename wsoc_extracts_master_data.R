@@ -12,6 +12,8 @@
 ## 1. Load Necessary Packages and Data Files -----------------------------------
 
 require(tidyverse)
+require(data.table) # for editing to tidy data
+require(stringi) # for editing text strings
 
 # set file location
 directory = "./EXCHANGE Downloaded Data"
@@ -64,7 +66,8 @@ soils_all_edit <- soils_all_edit[,c(1,2,14,15,3:13,16:18)]
 water_soil_characteristics <- inner_join(water_all_edit, soils_all_edit, 
                                          by = c("campaign", "kit_id"))
 
-## 4. Add Collection Metadata --------------------------------------------------
+
+## 4. Add Collection Metadata to Master Data Set -------------------------------
 
 # pull lat long info to make easy data frame for all GIS work
 collection_coordinates <- sample_metadata %>%
@@ -73,38 +76,80 @@ collection_coordinates <- sample_metadata %>%
 collection_coordinates$kit_id <- sample_metadata$kit_id
 collection_coordinates <- collection_coordinates[,c(11,1:10)]
 
-# pivot the columns into rows for latitude
+# pivot the columns into rows for latitude (using data.table)
+# pivot_longer function in tidyr package was difficult to break down two 
+# different groups of columns into one "key" column
+dt <- data.table(collection_coordinates)
+
+dt_edit <- melt(dt, id.vars = "kit_id",
+                measure.vars = patterns(latitude = "_latitude",
+                                        longitude = "_longitude"),
+                variable.name = "transect_location")
+
+# make data table back into data frame
+collection_coordinates <- as.data.frame(dt_edit)
+
+# change names of transect locations
 collection_coordinates <- collection_coordinates %>%
-  pivot_longer(c(2:6), names_to = "transect_location", values_to = "latitude")
+  mutate(transect_location = case_when(
+              transect_location == 1 ~ "Water",
+              transect_location == 2 ~ "Sediment",
+              transect_location == 3 ~ "Wetland",
+              transect_location == 4 ~ "Transition",
+              transect_location == 5 ~ "Upland"))
 
-# mutate transect_location
-locations <- as.data.frame(unique(collection_coordinates$transect_location))
-colnames(locations) <- "old"
+# make sure kit_id and transect_location are factor variables
+collection_coordinates[,c("kit_id", "transect_location")] <- lapply(
+  collection_coordinates[,c("kit_id", "transect_location")],
+  function(x) as.factor(x)
+)
 
-locations$new <- c("Water", "Sediment", "Wetland", "Transition", "Upland")
+# write out rds file to use in GIS-related scripts
+write_rds(collection_coordinates, 
+          "./Processed Data/sample_collection_coordinates.rds")
 
-for (n in 1:nrow(locations)) {
-  search <- locations[n,1]
-  replace_value <- locations[n,2]
-  
-  # find matching values to "search" and replace with "replace"
-  collection_coordinates$transect_location <- sapply(
-                                      collection_coordinates$transect_location,
-                                                     function(x){x[x==search] 
-                                                       <- replace_value
-                                                     
-                                                     return(x)
-                                                     })
-}
+# add water info
+water_metadata <- sample_metadata[,c(1,6,7)]
 
-# change column names of long values to match transect location
-colnames(collection_coordinates)[2:6] <- locations$new
-
-# pivot remaining columns into rows for longitude
-collection_coordinates <- collection_coordinates %>%
-  pivot_longer(c(2:6), names_to = "transect_location", values_to = "longitude")
+water_soil_characteristics <- left_join(water_soil_characteristics, 
+                                        water_metadata,
+                                        by = "kit_id")
 
 
-# make metadata into tidyish format to merge with other parameters
-# take water info out
+# 5. Add Final Edits to the Data Frame -----------------------------------------
 
+# add water body variable
+water_soil_characteristics <- water_soil_characteristics %>%
+  mutate(water_body = case_when(
+    region == "Great Lakes" ~ "Great Lakes",
+    state == "VA" | state == "MD" ~ "Chesapeake Bay",
+    state == "PA" | state == "DE" | state == "NJ" ~ "Delaware Bay"
+  ))
+
+# edit water_systemtype variable
+water_soil_characteristics$water_systemtype <- stri_replace(
+  water_soil_characteristics$water_systemtype,
+  fixed = ", ", "/"
+)
+
+# make variables factor variables
+water_soil_characteristics[,c("kit_id", "transect_location", "state",
+                              "region", "water_body", "water_systemtype",
+                              "soil_horizon", "visible_iron_oxidation",
+                              "visible_minerals", "visible_white_flakes")] <-
+  lapply(water_soil_characteristics[,c("kit_id", "transect_location", "state",
+                                       "region", "water_body", 
+                                       "water_systemtype", "soil_horizon", 
+                                       "visible_iron_oxidation", 
+                                       "visible_minerals", 
+                                       "visible_white_flakes")],
+         function(x) as.factor(x)
+  )
+
+# reorder variables
+water_soil_characteristics <- water_soil_characteristics[,c(1,2,10,11,28,27,3:9,
+                                                            26,12:25)]
+
+# write out data frame as rds file
+write_rds(water_soil_characteristics, 
+          "./Processed Data/EC1_water_soil_data.rds")
