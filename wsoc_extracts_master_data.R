@@ -116,7 +116,7 @@ water_soil_characteristics <- left_join(water_soil_characteristics,
                                         by = "kit_id")
 
 
-# 5. Add Final Edits to the Data Frame -----------------------------------------
+## 5. Add Final Edits to the Data Frame ----------------------------------------
 
 # add water body variable
 water_soil_characteristics <- water_soil_characteristics %>%
