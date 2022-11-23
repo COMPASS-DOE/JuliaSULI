@@ -77,7 +77,8 @@ readmes_all <- ReadMes %>%
 
 # 4. Work with Duplicate NPOC Values -------------------------------------------
 
-## Replace values over cal curve with the rerun NPOC values and the dilution factors
+## Replace values over cal curve with the rerun NPOC values and the dilution 
+## factors
 # make the date column numerical
 npoc_raw$date <- as.numeric(npoc_raw$date)
 readmes_all$date <- as.numeric(readmes_all$date)
@@ -93,7 +94,8 @@ readmes_all_dups <- readmes_all %>%
   filter(dups == TRUE)
 
 # combine the duplicate data frames
-npoc_raw_dups <- left_join(npoc_raw_dups, readmes_all_dups, by = c("sample_name", "date", "dups"))
+npoc_raw_dups <- left_join(npoc_raw_dups, readmes_all_dups, 
+                           by = c("sample_name", "date", "dups"))
 
 # make a dataset without the duplicates
 npoc_raw_noduplicates <- npoc_raw %>%
@@ -109,15 +111,17 @@ readmes_all_dilution_replaced <- readmes_all_noduplicates
 npoc_raw_replaced$npoc_date <- npoc_raw_replaced$date
 colnames(npoc_raw_replaced)[4] <- "tdn_date"
 
-# loop through the rows needing replacement, check conditions, and replace values
+# loop through the rows needing replacement, check conditions, replace values
 for (n in 1:nrow(npoc_raw_dups)) {
   
-  # find the rows in the original dataset that match names needing to be replaced
+  # find the rows in the original dataset that match names that need replaced
   for (i in 1:nrow(npoc_raw_replaced)) {
    if (npoc_raw_replaced$sample_name[i] == npoc_raw_dups$sample_name[n]) {
      
-     # check if the date of the duplicates is greater than the date of the original data 
-     # assumption here that rerun data will be more recent and will be the desired values to process (because they were rerun for a reason)
+     # check if the date of the duplicates is greater than the date of the 
+     # original data 
+     # assumption here that rerun data will be more recent and will be the 
+     # desired values to process (because they were rerun for a reason)
      if (npoc_raw_dups$date[n] > npoc_raw_replaced$npoc_date[i]) {
        
        # replace values
@@ -131,15 +135,17 @@ for (n in 1:nrow(npoc_raw_dups)) {
 }
 
 # edit dilution column to have one factor for TDN and one for NPOC
-readmes_all_dilution_replaced$npoc_dilution <- readmes_all_dilution_replaced$Dilution
+readmes_all_dilution_replaced$npoc_dilution <- 
+  readmes_all_dilution_replaced$Dilution
 colnames(readmes_all_dilution_replaced)[3] <- "tdn_dilution"
 
 # same loop, but for dilution factors
 for (n in 1:nrow(npoc_raw_dups)) {
   
-  # find the rows in the original dataset that match names needing to be replaced
+  # find the rows in the original dataset that match names that need replaced
   for (i in 1:nrow(readmes_all_dilution_replaced)) {
-    if (readmes_all_dilution_replaced$sample_name[i] == npoc_raw_dups$sample_name[n]) {
+    if (readmes_all_dilution_replaced$sample_name[i] == 
+        npoc_raw_dups$sample_name[n]) {
       
       # check if the date of the duplicates is greater than the date of the 
       # original data 
@@ -148,7 +154,8 @@ for (n in 1:nrow(npoc_raw_dups)) {
       if (npoc_raw_dups$date[n] > readmes_all_dilution_replaced$date[i]) {
         
         # replace values
-        readmes_all_dilution_replaced$npoc_dilution[i] <- npoc_raw_dups$Dilution[n]
+        readmes_all_dilution_replaced$npoc_dilution[i] <- 
+          npoc_raw_dups$Dilution[n]
         
         # replace the date of measurement
         readmes_all_dilution_replaced$date[i] <- npoc_raw_dups$date[n]
@@ -198,7 +205,8 @@ npoc_blank_corrected <- bind_rows(npoc_blank_corrected,
 colnames(readmes_all_dilution_replaced)[4] <- "npoc_date"
 
 samples_dilution_corrected <- npoc_blank_corrected %>%
-  left_join(readmes_all_dilution_replaced, by = c("sample_name", "npoc_date", "dups")) %>% 
+  left_join(readmes_all_dilution_replaced, by = c("sample_name", "npoc_date", 
+                                                  "dups")) %>% 
   mutate(npoc_mgl = ifelse(!is.na(npoc_bc), npoc_bc * npoc_dilution,
                            npoc_raw * npoc_dilution),
          tdn_mgl = ifelse(!is.na(tdn_bc), tdn_bc * tdn_dilution, 
@@ -208,8 +216,8 @@ samples_dilution_corrected <- npoc_blank_corrected %>%
 
 # 8. Final Dataset Prep --------------------------------------------------------
 
-# overwrite blank-sol TN values because they were diluted MQ which doesn't make sense
-# values won't be used in analysis anyways
+# overwrite blank-sol TN values because they were diluted MQ which doesn't 
+# make sense; values won't be used in analysis anyways
 samples_dilution_corrected[c(35,37,39), "tdn_mgl"] <- 9999999
 
 # select desired columns
@@ -217,7 +225,8 @@ wsoc <- samples_dilution_corrected %>%
   select(sample_name, tdn_date, npoc_date, campaign, kit_id, transect_location, 
          npoc_mgl, tdn_mgl)
 
-# 9. Write out data ----------------------------------------------------------------
+# 9. Write out data ------------------------------------------------------------
 date_updated <- "20221118"
 
-write_csv(wsoc, paste0("./Processed Data/EC1_WSOC_Extracts_NPOC_TDN_L0B_", date_updated, ".csv"))
+write_csv(wsoc, paste0("./Processed Data/EC1_WSOC_Extracts_NPOC_TDN_L0B_", 
+                       date_updated, ".csv"))
