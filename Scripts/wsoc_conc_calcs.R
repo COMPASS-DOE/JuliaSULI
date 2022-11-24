@@ -58,6 +58,8 @@ wsom_extracts <- wsom_extracts %>%
   mutate(wsoc_conc = (npoc_mgl*water_L)/soil_mass,
          wson_conc = (tdn_mgl*water_L)/soil_mass)
 
+# write out full concentrations data frame as csv
+write.csv(wsom_extracts, "./wsom_extracts_wsoc_wson_conc.csv")
 
 ## 4. Calculate Kit Replicate % Error and Average Concentrations ---------------
 
@@ -111,3 +113,45 @@ for (i in 1:nrow(rep_list)) {
 
 # write out the perc error calcs
 write.csv(npoc_tdn_perc_diff, "./wsom_extracts_npoc_tdn_perc_error_calcs.csv")
+
+
+## 5. Replace Replicate Kit Concentrations w/ Averages -------------------------
+
+# remove replicate rows and cut out unnecessary columns
+wsom_extracts_noreps <- wsom_extracts %>%
+  filter(!grepl("_rep", kit_id)) %>%
+  select(-c(1:3,9:11))
+
+# make replacement data frame
+wsom_extracts_noreps_replaced <- wsom_extracts_noreps
+
+# replace wsoc and wson concentrations
+for (x in 1:nrow(kit_replicates_averages)) {
+  
+  # set search and replace values
+  search_id <- kit_replicates_averages[x,"kit_id"]
+  search_location <- kit_replicates_averages[x,"transect_location"]
+  new_wsoc_value <- kit_replicates_averages[x,"avg_wsoc_conc"]
+  new_wson_value <- kit_replicates_averages[x, "avg_wson_conc"]
+  
+  for (a in 1:nrow(wsom_extracts_noreps_replaced)) {
+    
+    # find matches between averaged kits and the larger data frame
+    if (wsom_extracts_noreps_replaced[a,"kit_id"] == search_id &
+        wsom_extracts_noreps_replaced[a,"transect_location"] 
+        == search_location) {
+      
+      wsom_extracts_noreps_replaced[a,"wsoc_conc"] <- new_wsoc_value
+      wsom_extracts_noreps_replaced[a,"wson_conc"] <- new_wson_value
+    }
+  }
+}
+
+## 6. Final Data Edits and Write Out -------------------------------------------
+
+# produce data frame with just ID information and concentrations in
+# mg per g dry weight
+wsom_conc <- wsom_extracts_noreps_replaced %>%
+  select(-c(npoc_mgl,tdn_mgl))
+
+write_rds(wsom_conc, "./R Data Files/wsom_conc.rds")
