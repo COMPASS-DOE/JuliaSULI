@@ -1,0 +1,128 @@
+---
+title: " EXCHANGE Spatial Data Work"
+output: html_document
+date: "2022-10-21"
+---
+
+## Set-Up
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# load packages
+library(ggplot2)
+library(raster)
+library(sp)
+library(rgdal)
+```
+
+## Load in Land Cover
+
+```{r}
+# use raster package to interpret .img file
+NLCD <- raster::raster("C:/Users/mcel487/OneDrive - PNNL/Documents/Original Data Downloads/2019_Land_Cover_L48.tif")
+
+# plot the raster
+raster::plot(NLCD) # is returning "Error in setValues(outras, m) : values must be numeric, logical or factor when using the .img file"
+```
+
+```{r}
+# try with FedData package
+# https://rdrr.io/github/ropensci/FedData/f/README.md
+library(FedData)
+
+# test loading sample area
+# plot(FedData::meve) #Mesa Verde National Park
+
+# get NLCD for the area
+NLCD <- get_nlcd(template = FedData::meve, year = 2019, label = "meve")
+# couldn't access the server so downloaded the tif file to use instead
+
+```
+
+```{r}
+# https://stackoverflow.com/questions/15824853/large-img-file-processing-in-r-gis
+# prepare site data
+load("water_collection_lat_long.RData")
+
+# simplify to lat/long
+water_lat_long <- water_sites[, -1]
+
+# make sure lat/long list is a spatial data type - tell R which columns of the data frame are (long, lat)
+coordinates(water_lat_long) <- c("water_longitude", "water_latitude")
+
+# reproject lat/long to match the tif file
+crs(NLCD) #check coordinate reference system of the tif
+proj4string(water_lat_long) <- CRS("+proj=longlat +ellps=GRS80 +datum=NAD83") 
+# assign some sort of CRS to the points (in this case the NAD83 reference)
+
+trans_water_lat_long <- spTransform(water_lat_long, CRS("+proj=aea +lat_0=23 +lon_0=-96 +lat_1=29.5 +lat_2=45.5 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs"))
+# took the CRS from the raster tif file to make sure tif file and sites match!
+
+# check to make sure points plot on the raster
+plot(NLCD)
+points(trans_water_lat_long)
+
+# save R objects as shapefiles to be used in GIS software
+# raster::shapefile(water_lat_long, "water_collection_sites_newCRS.shp") 
+
+# extract land cover information
+landcover <- extract(NLCD, trans_water_lat_long)
+
+# extract with a larger buffer for the sites in open water
+landcover_buffer <- extract(NLCD, trans_water_lat_long, buffer = 30)
+
+# bigger buffer for the few sites further from land
+landcover_big_biffer <- extract(NLCD, trans_water_lat_long, buffer = 100)
+```
+
+```{r}
+# put land cover data back with the kit IDs
+water_sites$landcover <- landcover
+
+# make landcover a factor variable
+water_sites$landcover <- as.factor(water_sites$landcover)
+
+# code 11 from the raster corresponds to "open water" - pull the value of the closest landcover from the additional buffered files
+# cycle by row
+for (n in 1:nrow(water_sites)) {
+  
+  # determine if landcover is 11
+  if (water_sites$landcover[n] == 11) {
+    
+    # cycle through the number of values in the corresponding list piece in the small buffered dataset
+    for(x in 1:length(landcover_buffer[[n]])) {
+      
+      # if that value in the list is not 11, pull it out
+      if (landcover_buffer[[n]][x] != 11) {
+        water_sites$landcover_supplement[n] <- landcover_buffer[[n]][x]
+      }
+      
+    }
+  }
+}
+
+```
+
+
+## Load in Delaware Bay NHD Plus
+
+```{r}
+# look at the list of files in the geodatabase
+# rdgal is the package needed for .gdb files
+
+# https://workshops.distancesampling.org/duke-spatial-2015/practicals/process-geodata-2.html#:~:text=In%20R%20we%20can%20use,also%20access%20shapefiles%20and%20rasters).
+# https://gis.stackexchange.com/questions/151613/reading-feature-class-in-file-geodatabase-using-r
+
+# ogrListLayers("delaware_bay_NHD+.gdb") # shows all the possible feature classes/layers
+# file <- readOGR(.gdb, layer = "") pulls in desired layers
+```
+
+```{r}
+# ended up editing files in QGIS - load in exported shapefiles
+library(shapefiles) # necessary package
+
+# bring in shapefile
+delaware_bay <- shapefile("C:/Users/mcel487/OneDrive - PNNL/Documents/GitHub/COMPASS-DOE/JuliaSULI/NHD+_streamorder_delawarebay.shp")
+```
+
