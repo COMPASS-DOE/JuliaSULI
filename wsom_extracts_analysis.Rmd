@@ -1,0 +1,278 @@
+---
+title: "WSOM Extracts Analysis"
+output: html_document
+date: "2022-11-24"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load Packages and Data
+
+```{r, include=FALSE, warning = FALSE, message = FALSE}
+# required packages
+packages_list <- c("tidyverse", "broom", "ggpubr", "sf", "ggspatial",
+                   "rnaturalearth", "rnaturalearthdata",
+                   "rnaturalearthhires", "rstatix", "ggcorrplot",
+                   "GGally")
+
+lapply(packages_list, library, character.only = TRUE)
+
+# set data files location
+data_location = paste0(getwd(), "/R Data Files")
+
+# RDS files - master water/soil data, sample site coordinates, wsom concentrations
+water_soil <- read_rds(paste0(data_location, "/EC1_water_soil_data.rds"))
+site_coordinates <- read_rds(paste0(data_location, 
+                                    "/sample_collection_coordinates.rds"))
+wsom_conc <- read_rds(paste0(data_location, "/wsom_conc.rds"))
+```
+
+## Set-Up
+
+```{r}
+# set ggplot theme - remove dark background
+theme_set(theme_bw())
+
+# create color palette
+palette <- c("#056009","#0385B5","#021677","#ABABD9","#27220F","#8E7941",
+             "#DCCD6A","#8F8D90")
+```
+
+## Map Figures
+
+```{r}
+# pull info from rnaturalearth
+usa <- ne_states(country = "United States of America", returnclass = "sf")
+gl <- ne_states(country = c("United States of America", "Canada"), 
+                returnclass = "sf")
+
+# filter coordinates to water sites only for mapping
+water_gps <- site_coordinates %>%
+  filter(transect_location == "Water")
+
+# plot all EXCHANGE water sites
+ggplot(data = gl) +
+  geom_sf(fill = "#EEEEEE") +
+  coord_sf(xlim = c(-92,-74), ylim = c(37,48)) +
+  geom_point(data = water_gps, mapping = aes(x = longitude, y = latitude)) +
+  labs(x = "Longitude", y = "Latitude") +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+  # last line removes grid lines from the map
+
+# crop to Chesapeake
+ggplot(data = gl) +
+  geom_sf(fill = "#EEEEEE") +
+  coord_sf(xlim = c(-78,-74), ylim = c(37,40.5)) +
+  geom_point(data = water_gps, mapping = aes(x = longitude, y = latitude)) +
+  labs(x = "Longitude", y = "Latitude") +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+```
+
+```{r}
+# make a list of my sites for filtering the data
+extract_sites <- list("K010", "K013", "K018", "K019", "K025", "K026", "K035",
+                      "K048", "K050", "K061")
+
+# filter site coordinates (and remove sediment points)
+extracts_gps <- site_coordinates %>%
+  filter(kit_id %in% extract_sites & transect_location != "Sediment")
+
+# just plot water for general site locations
+ggplot(data = gl) +
+  geom_sf(fill = "#EEEEEE") +
+  coord_sf(xlim = c(-92,-74), ylim = c(37,48)) +
+  geom_point(data = filter(extracts_gps, transect_location == "Water"), 
+             mapping = aes(x = longitude, y = latitude)) +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) +
+  labs(x = "Longitude", y = "Latitude")
+
+# zoom in on chesapeake and plot the full transect
+ggplot(data = gl) +
+  geom_sf(fill = "#EEEEEE") +
+  coord_sf(xlim = c(-78,-74), ylim = c(37,40.5)) +
+  geom_point(data = extracts_gps, mapping = aes(x = longitude, y = latitude, 
+                                                color = transect_location)) +
+  labs(x = "Longitude", y = "Latitude") +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+```
+
+## Patterns in WSOC and WSON
+
+```{r}
+# filter water/soil characteristics and merge with WSOM info
+wsom_extracts <- water_soil %>%
+  filter(kit_id %in% wsom_conc$kit_id & transect_location != "Sediment") %>%
+  left_join(wsom_conc, by = c("campaign", "kit_id", "transect_location"))
+
+# relevel transect_location variable
+wsom_extracts$transect_location <- factor(wsom_extracts$transect_location,
+                                          levels = c("Upland", "Transition",
+                                                     "Wetland"))
+```
+
+```{r}
+# density plot to look at WSOC and WSON value distributions
+ggplot(wsom_extracts, aes(x = wsoc_conc)) +
+  geom_density()
+
+ggplot(wsom_extracts, aes(x = wson_conc)) +
+  geom_density()
+
+# both are non-normally distributed (gamma distribution)
+# move forward using non-parametric statistical tests
+```
+
+```{r}
+# boxplot for WSOC by transect location
+ggplot(wsom_extracts) +
+  geom_boxplot(aes(x = transect_location, y = wsoc_conc, fill = transect_location),
+               show.legend = FALSE) +
+  scale_fill_manual(values = palette) +
+  labs(x = "Location", y = "WSOC Concentration (mg/g soil)")
+
+# non-parametric ANOVA
+kt_wsoc <- kruskal.test(wsoc_conc ~ transect_location, data = wsom_extracts)
+dunn_test(wsom_extracts, wsoc_conc ~ transect_location)
+
+# test line graph to look at changes across the transect in WSOC
+a <- ggplot(wsom_extracts, aes(x = transect_location, y = wsoc_conc, color = kit_id,
+                          group = kit_id)) +
+  geom_point() +
+  geom_line() +
+  facet_wrap(~water_body)
+
+b <- ggplot(wsom_extracts, aes(x = transect_location, y = tc_perc, color = kit_id,
+                               group = kit_id)) +
+  geom_point() +
+  geom_line() +
+  facet_wrap(~water_body)
+
+ggarrange(a,b, ncol = 1,
+          common.legend = TRUE, legend = "right")
+```
+
+```{r}
+# boxplot for WSOC regionally
+ggplot(wsom_extracts) +
+  geom_boxplot(aes(x = region, y = wsoc_conc, fill = transect_location)) +
+  scale_fill_manual(values = palette) +
+  labs(x = "Region", y = "WSOC Concentration (mg/g soil)", fill = "Transect Location")
+
+# non-parametric ANOVA
+kt_wsoc_region <- kruskal.test(wsoc_conc ~ region, data = wsom_extracts)
+dunn_test(wsom_extracts, wsoc_conc ~ region)
+```
+
+```{r}
+# boxplot for tc percent
+ggplot(data = wsom_extracts, aes(x = transect_location, y = tc_perc, fill = transect_location)) +
+  geom_boxplot(show.legend = FALSE) +
+  scale_fill_manual(values=palette) +
+  labs(x = "Transect Location", y = "Total Carbon %")
+
+# kruskal-wallis test
+kt_tc <- kruskal.test(tc_perc ~ transect_location, wsom_extracts)
+dunn_test(wsom_extracts, tc_perc ~ transect_location)
+
+# boxplot and kruskal-wallis test for tc across all sites (not just extract sites)
+ggplot(filter(water_soil, transect_location == "Upland"|transect_location == "Transition" | transect_location == "Wetland"), 
+       aes(x = transect_location, y = tc_perc, fill = transect_location)) +
+  geom_boxplot(show.legend = FALSE) +
+  scale_fill_manual(values = palette) +
+  labs(x = "Transect Location", y = "Total Carbon (%)")
+
+kt_tc_all <- kruskal.test(tc_perc ~ transect_location, water_soil)
+dunn_test(water_soil, tc_perc ~ transect_location)
+```
+
+```{r}
+# boxplot for WSON
+ggplot(wsom_extracts) +
+  geom_boxplot(aes(x = transect_location, y = wson_conc, fill = transect_location),
+               show.legend = FALSE) +
+  scale_fill_manual(values = palette) +
+  labs(x = "Location", y = "WSON Concentration (mg/g soil)")
+```
+
+## WSOM and Other Soil Characteristics
+
+### Correlation Plot for WSOC
+
+```{r}
+# pull variables
+wsoc_corr <- wsom_extracts[,c(16:18,20,29)]
+
+# make correlation matrix
+wsoc_corr_matrix <- cor(wsoc_corr, use = "complete.obs")
+wsoc_corr_pvalue <- cor_pmat(wsoc_corr)
+
+# plot correlation matrix
+ggcorrplot(wsoc_corr_matrix, hc.order = TRUE,
+    type = "lower", lab = TRUE)
+```
+
+```{r, warning = FALSE, message = FALSE}
+# matrix of scatterplots
+# set the grouping variable for graphing
+groups <- wsom_extracts[,15]
+
+# plot with base R
+pairs(wsoc_corr,
+      labels = c("Bulk Density (g/cm3)", "LOI (%)", "GWC (%)", "Total Carbon %", "pH",
+                 "WSOC (mg/g soil)"),
+      pch = 21,
+      bg = palette[c(1:3)][groups],
+      col = palette[c(1:3)][groups],
+      upper.panel = NULL)
+
+# plot with ggplot
+ggpairs(wsoc_corr, ggplot2::aes(color = groups),
+        #lower = list(continuous = "smooth"), # adds lm line to the scatterplots
+        columnLabels = c("Bulk Density (g/cm3)", "LOI (%)", "GWC (%)",
+                         "Total Carbon (%)", "WSOC (mg/g soil)")) +
+  ggplot2::scale_fill_manual(values = palette) +
+  ggplot2::scale_color_manual(values = palette)
+```
+
+### Relationship between Total Carbon % and WSOC Concentration
+
+```{r}
+# soil TC vs WSOC plot
+ggplot(wsom_extracts, aes(x = tc_perc, y = wsoc_conc)) +
+  geom_smooth(formula = y~x, method = "lm", se = FALSE, color = palette[8]) +
+  labs(x = "Soil Total Carbon %", y = "WSOC Concentration (mg/g soil)", color = "Location") +
+  scale_color_manual(values = palette) +  
+  geom_point(aes(color = transect_location), size = 2.5) +
+  stat_regline_equation(aes(label = ..rr.label..))
+
+# stat_regline_equation is part of the ggpubr package
+# can also put the full equation, AIC, BIC...
+```
+
+```{r}
+# fit a linear model (w/ transect location)
+wsoc_tc <- lm(wsoc_conc ~ tc_perc + transect_location, data = wsom_extracts)
+
+# look at full output
+summary(wsoc_tc)
+
+# model w/o location
+lm(wsoc_conc ~ tc_perc, data = wsom_extracts) %>%
+  summary()
+```
+
+### Relationship between Total Nitrogen % and WSON
+
+```{r}
+ggplot(wsom_extracts, aes(x = tn_perc, y = wson_conc)) +
+  geom_smooth(formula = y~x, method = "lm", se = FALSE, color = palette[8]) +
+  labs(x = "Soil Total Nitrogen %", y = "WSON Concentration (mg/g soil)", color = "Location") +
+  scale_color_manual(values = palette) +  
+  geom_point(aes(color = transect_location), size = 2.5) +
+  stat_regline_equation(aes(label = ..rr.label..))
+```
+
+## WSOM and Surface Water DOM
+
