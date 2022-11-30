@@ -16,7 +16,7 @@ require(data.table) # for editing to tidy data
 require(stringi) # for editing text strings
 
 # set file location
-directory = "./EXCHANGE Downloaded Data"
+directory = "./Original Data Files"
 
 # pulled from ec1-tai-geochemistry GitHub repo
 soils_all <- readRDS(paste0(directory,"/soils_data_merged_withmeta.rds"))
@@ -25,7 +25,7 @@ soils_all <- readRDS(paste0(directory,"/soils_data_merged_withmeta.rds"))
 # metadata for sampling locations and conditions, water NPOC/TDN, 
 # TSS, and pH, alkalinity, etc.
 sample_metadata <- read.csv(paste0(directory,
-                                   "/EC1_Metadata_CollectionLevel.csv"))
+                                   "/EC1_Metadata_CollectionLevel_updated.csv"))
 water_npoc_tdn <- read.csv(paste0(directory,
                                   "/EC1_Water_NPOC_TDN_L0B_20220601.csv"))
 water_tss <- read.csv(paste0(directory,
@@ -106,7 +106,7 @@ collection_coordinates[,c("kit_id", "transect_location")] <- lapply(
 
 # write out rds file to use in GIS-related scripts
 write_rds(collection_coordinates, 
-          "./Processed Data/sample_collection_coordinates.rds")
+          "./R Data Files/sample_collection_coordinates.rds")
 
 # add water info
 water_metadata <- sample_metadata[,c(1,6,7)]
@@ -152,4 +152,4 @@ water_soil_characteristics <- water_soil_characteristics[,c(1,2,10,11,28,27,3:9,
 
 # write out data frame as rds file
 write_rds(water_soil_characteristics, 
-          "./Processed Data/EC1_water_soil_data.rds")
+          "./R Data Files/EC1_water_soil_data.rds")
