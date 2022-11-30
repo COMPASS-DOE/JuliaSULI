@@ -17,7 +17,7 @@ getwd()
 
 # load in csv files
 wsoc_masses <- read.csv("./wsoc_extracts_masses.csv", na.strings = "N/A")
-wsoc_npoc_tdn <- read.csv("./EC1_WSOC_Extracts_NPOC_TDN_L0B_20221118.csv")
+wsoc_npoc_tdn <- read.csv("./Processed Data/EC1_WSOC_Extracts_NPOC_TDN_L0B_20221118.csv")
 
 
 ## 2. Merge Data Files ---------------------------------------------------------
