@@ -19,8 +19,21 @@ getwd()
 wsoc_masses <- read.csv("./wsoc_extracts_masses.csv", na.strings = "N/A")
 wsoc_npoc_tdn <- read.csv("./Processed Data/EC1_WSOC_Extracts_NPOC_TDN_L0B_20221118.csv")
 
+# read in soils RDS file for GWC
+soils_all <- readRDS("./Original Data Files/soils_data_merged_withmeta.rds")
+
 
 ## 2. Merge Data Files ---------------------------------------------------------
+
+# pull out necessary GWC values for back calculation to field moist soils
+extracts_gwc <- soils_all %>%
+  filter(kit_id %in% substr(wsoc_npoc_tdn$kit_id,1,4) & 
+           transect_location %in% wsoc_npoc_tdn$transect_location) %>%
+  select(kit_id, transect_location, gwc_perc)
+
+# add GWC to the npoc/tdn data frame
+wsoc_npoc_tdn <- left_join(wsoc_npoc_tdn, extracts_gwc, by =
+                             c("kit_id", "transect_location"))
 
 # make sure replicate kits are named that way
 for (n in 1:nrow(wsoc_npoc_tdn)) {
@@ -47,19 +60,30 @@ wsom_extracts <- wsom_extracts_withblanks %>%
 ## (mg/L NPOC * L water used) / g soil used
 
 # set value of water density
-water_density <- 0.99823 # density of water @ room temp (g/mL)
+water_density <- 0.99777 # density of water @ room temp 22C (g/mL)
 water_density_gL <- water_density*1000
 
 # calculate L of water used for extraction
 wsom_extracts$water_L <- wsom_extracts$water_mass / water_density_gL
 
-# apply formula to get mg WSOM/g soil of carbon and nitrogen
+# apply formula to get mg WSOM/g dry soil of carbon and nitrogen
 wsom_extracts <- wsom_extracts %>%
   mutate(wsoc_conc = (npoc_mgl*water_L)/soil_mass,
          wson_conc = (tdn_mgl*water_L)/soil_mass)
 
+## also calculate normalized to field moist soil (back calculate from GWC)
+# calculate the field moist equivalent of the freeze dried soil used
+wsom_extracts <- wsom_extracts %>%
+  mutate(field_soil = ((gwc_perc/100)*soil_mass)+soil_mass)
+
+# apply formula for mg WSOM/g field moist soil
+wsom_extracts <- wsom_extracts %>%
+  mutate(wsoc_conc_field = (npoc_mgl*water_L)/field_soil,
+         wson_conc_field = (tdn_mgl*water_L)/field_soil)
+
 # write out full concentrations data frame as csv
 write.csv(wsom_extracts, "./wsom_extracts_wsoc_wson_conc.csv")
+
 
 ## 4. Calculate Kit Replicate % Error and Average Concentrations ---------------
 
@@ -72,14 +96,17 @@ rep_list <- wsom_extracts %>%
 kit_replicates <- wsom_extracts %>%
   filter(substr(wsom_extracts$sample_name,1,10) %in% 
                 substr(rep_list$sample_name,1,10)) %>%
-  select(kit_id, wsoc_conc, wson_conc, transect_location)
+  select(kit_id, wsoc_conc, wson_conc, transect_location, wsoc_conc_field, 
+         wson_conc_field)
 
 # average calcs
 kit_replicates_averages <- kit_replicates %>%
   mutate(kit_id = substr(kit_id, 1,4)) %>%# replicate kits have same name
   group_by(kit_id, transect_location) %>%
   summarize(avg_wsoc_conc = mean(wsoc_conc),
-            avg_wson_conc = mean(wson_conc))
+            avg_wson_conc = mean(wson_conc),
+            avg_wsoc_conc_field = mean(wsoc_conc_field),
+            avg_wson_conc_field = mean(wson_conc_field))
 
 # calculate percent difference
 npoc_tdn_perc_diff <- kit_replicates_averages %>%
@@ -87,6 +114,8 @@ npoc_tdn_perc_diff <- kit_replicates_averages %>%
 
 npoc_tdn_perc_diff$wsoc_perc_error <- NA # create columns for calcs
 npoc_tdn_perc_diff$wson_perc_error <- NA
+npoc_tdn_perc_diff$wsoc_field_perc_error <- NA
+npoc_tdn_perc_diff$wson_field_perc_error <- NA
 
 for (i in 1:nrow(rep_list)) {
   
@@ -109,6 +138,22 @@ for (i in 1:nrow(rep_list)) {
                             "wson_conc"]) /
       kit_replicates_onekit[!grepl("_rep", kit_replicates_onekit$kit_id), 
                             "wson_conc"]) * 100)
+  
+  npoc_tdn_perc_diff$wsoc_field_perc_error[i] <-     
+    abs(((kit_replicates_onekit[grepl("_rep", kit_replicates_onekit$kit_id),
+                                "wsoc_conc_field"] - 
+            kit_replicates_onekit[!grepl("_rep", kit_replicates_onekit$kit_id), 
+                                  "wsoc_conc_field"]) /
+           kit_replicates_onekit[!grepl("_rep", kit_replicates_onekit$kit_id), 
+                                 "wsoc_conc_field"]) * 100)
+  
+  npoc_tdn_perc_diff$wson_field_perc_error[i] <-     
+    abs(((kit_replicates_onekit[grepl("_rep", kit_replicates_onekit$kit_id),
+                                "wson_conc_field"] - 
+            kit_replicates_onekit[!grepl("_rep", kit_replicates_onekit$kit_id), 
+                                  "wson_conc_field"]) /
+           kit_replicates_onekit[!grepl("_rep", kit_replicates_onekit$kit_id), 
+                                 "wson_conc_field"]) * 100)
 }
 
 # write out the perc error calcs
@@ -133,6 +178,8 @@ for (x in 1:nrow(kit_replicates_averages)) {
   search_location <- kit_replicates_averages[x,"transect_location"]
   new_wsoc_value <- kit_replicates_averages[x,"avg_wsoc_conc"]
   new_wson_value <- kit_replicates_averages[x, "avg_wson_conc"]
+  new_wsoc_field_value <- kit_replicates_averages[x, "avg_wsoc_conc_field"]
+  new_wson_field_value <- kit_replicates_averages[x, "avg_wson_conc_field"]
   
   for (a in 1:nrow(wsom_extracts_noreps_replaced)) {
     
@@ -143,15 +190,18 @@ for (x in 1:nrow(kit_replicates_averages)) {
       
       wsom_extracts_noreps_replaced[a,"wsoc_conc"] <- new_wsoc_value
       wsom_extracts_noreps_replaced[a,"wson_conc"] <- new_wson_value
+      wsom_extracts_noreps_replaced[a,"wsoc_conc_field"] <- new_wsoc_field_value
+      wsom_extracts_noreps_replaced[a,"wson_conc_field"] <- new_wson_field_value
     }
   }
 }
+
 
 ## 6. Final Data Edits and Write Out -------------------------------------------
 
 # produce data frame with just ID information and concentrations in
 # mg per g dry weight
 wsom_conc <- wsom_extracts_noreps_replaced %>%
-  select(-c(npoc_mgl,tdn_mgl))
+  select(-c(npoc_mgl,tdn_mgl,water_L,field_soil))
 
 write_rds(wsom_conc, "./R Data Files/wsom_conc.rds")
