@@ -82,7 +82,7 @@ wsom_extracts <- wsom_extracts %>%
          wson_conc_field = (tdn_mgl*water_L)/field_soil)
 
 # write out full concentrations data frame as csv
-write.csv(wsom_extracts, "./wsom_extracts_wsoc_wson_conc.csv")
+write.csv(wsom_extracts, "./Processed Data/wsom_extracts_wsoc_wson_conc.csv")
 
 
 ## 4. Calculate Kit Replicate % Error and Average Concentrations ---------------
@@ -157,7 +157,7 @@ for (i in 1:nrow(rep_list)) {
 }
 
 # write out the perc error calcs
-write.csv(npoc_tdn_perc_diff, "./wsom_extracts_npoc_tdn_perc_error_calcs.csv")
+write.csv(npoc_tdn_perc_diff, "./Processed Data/wsom_extracts_npoc_tdn_perc_error_calcs.csv")
 
 
 ## 5. Replace Replicate Kit Concentrations w/ Averages -------------------------
