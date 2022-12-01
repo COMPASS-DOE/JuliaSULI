@@ -1,0 +1,192 @@
+---
+title: "Soil Extracts CDOM Analysis"
+output: html_document
+date: "2022-11-30"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load Packages and Data
+
+```{r, message=FALSE, echo =FALSE, warning = FALSE}
+# required packages
+packages_list <- c("tidyverse", "broom", "ggpubr", "ggfortify")
+
+lapply(packages_list, library, character.only = TRUE)
+
+# set data files location
+data_location = paste0(getwd(), "/Original Data Files")
+
+# csv files for CDOM data
+water_cdom_peaks <- read_csv(paste0(data_location, "/EC1_Water_CDOM_DOCnormalizedpeakpicks_20221011.csv"))
+water_cdom_indices <- read_csv(paste0(data_location, "/EC1_Water_CDOM_SpectralIndices_20221011.csv"))
+
+extracts_cdom_peaks <- read_csv(paste0(data_location,
+                                       "/EC1_WSOC_Extracts_Nov2022_PeakPicks_DOCnormalized.csv"))
+extracts_cdom_indices <- read_csv(paste0(data_location, "/EC1_WSOC_Extracts_Nov2022_SpectralIndices.csv"))
+```
+
+## Set-Up
+
+```{r}
+# set ggplot theme - remove dark background
+theme_set(theme_bw())
+
+# create color palette
+palette <- c("#056009","#0385B5","#021677","#ABABD9","#27220F","#8E7941",
+             "#DCCD6A","#8F8D90")
+```
+
+```{r}
+# data frame edits
+extracts_cdom_indices <- extracts_cdom_indices %>%
+  filter(!is.na(SUVA254))
+
+names(extracts_cdom_peaks) <- gsub(pattern = "_per_unitDOC", replacement = "", 
+                                   x =names(extracts_cdom_peaks))
+
+names(water_cdom_peaks) <- gsub(pattern = "_per_unitDOC", replacement = "",
+                                x = names(water_cdom_peaks))
+
+colnames(extracts_cdom_indices)[1] <- "kit_id"
+colnames(extracts_cdom_peaks)[1] <- "kit_id"
+colnames(water_cdom_indices)[1] <- "kit_id"
+colnames(water_cdom_peaks)[1] <- "kit_id"
+
+# merge peaks and indices together
+extracts_cdom_original <- left_join(extracts_cdom_indices, extracts_cdom_peaks, by = "kit_id")
+water_cdom <- left_join(water_cdom_indices, water_cdom_peaks, by = "kit_id")
+
+# add a transect_location column
+water_cdom <- water_cdom %>%
+  mutate(transect_location = "Water")
+water_cdom <- water_cdom[,c(1,2,27,3:26)]
+
+extracts_cdom_original <- extracts_cdom_original %>%
+  mutate(transect_location = case_when(
+    grepl("T", kit_id) ~ "Transition",
+    grepl("UP", kit_id) ~ "Upland",
+    grepl("W", kit_id) ~ "Wetland"
+  ))
+extracts_cdom_original <- extracts_cdom_original[,c(1,2,27,3:26)]
+```
+
+```{r}
+## work with kit replicates
+# change kit id names
+extracts_cdom_original <- extracts_cdom_original %>%
+  mutate(kit_id = substr(kit_id, 1,4))
+extracts_cdom_original <- extracts_cdom_original %>%  
+  mutate(kit_id = case_when(
+    grepl("(Rep)", extracts_cdom_original$Sample_Description) ~ paste0(kit_id,"_rep"),
+    !grepl("(Rep)", extracts_cdom_original$Sample_Description) ~ kit_id))
+
+# pull out replicate kits and matches for potential error calculation
+extracts_cdom_rep_list <- extracts_cdom_original %>%
+  filter(grepl("_rep", kit_id))
+extracts_cdom_reps <- extracts_cdom_original %>%
+  filter(substr(extracts_cdom_original$Sample_Description,1,9) %in% 
+           substr(extracts_cdom_rep_list$Sample_Description,1,9))
+
+## calculate averages
+# make dataset copy
+extracts_cdom_reps_sum <- extracts_cdom_reps
+
+# replace kit names to be able to group by kit easier
+extracts_cdom_reps_sum$kit_id[grepl("_rep", extracts_cdom_reps_sum$kit_id)] <- gsub(pattern = "_rep",
+                                                                                    replacement = "", 
+                                                                                    x = extracts_cdom_reps_sum$kit_id[grepl("_rep", extracts_cdom_reps_sum$kit_id)])
+
+# remove unneeded columns
+extracts_cdom_reps_sum <- extracts_cdom_reps_sum[,-2]
+
+# group by kit_id and location and calculate averages of the metrics
+extracts_cdom_reps_sum <- extracts_cdom_reps_sum %>%
+  group_by(kit_id, transect_location) %>%
+  summarize(across(everything(), mean))
+
+## replace replicate kit values with averages
+# remove replicate labelled rows
+extracts_cdom_original <- extracts_cdom_original %>%
+  filter(!grepl("_rep", kit_id)) %>%
+  select(-Sample_Description)
+
+# use rows_update() function
+extracts_cdom <- extracts_cdom_original %>%
+  rows_update(extracts_cdom_reps_sum, by = c("kit_id", "transect_location"))
+```
+
+```{r}
+## merge CDOM datasets together 
+water_cdom <- water_cdom[,-2]
+extract_sites_CDOM <- rbind(extracts_cdom, filter(water_cdom, water_cdom$kit_id %in% extracts_cdom$kit_id))
+
+# group by kit to make it easier to look at!!
+extract_sites_CDOM$kit_id <- as.factor(extract_sites_CDOM$kit_id)
+extract_sites_CDOM$transect_location <- factor(extract_sites_CDOM$transect_location,
+                                               levels = c("Upland", "Transition", "Wetland",
+                                                          "Water"))
+
+extract_sites_CDOM <- extract_sites_CDOM %>%
+  group_by(kit_id)
+```
+
+## Preliminary PCA
+
+```{r}
+# set up data frame
+pca_extracts_cdom <- extract_sites_CDOM[,c(3,4,6,8:13)]
+
+# pull kit IDs to change the row names for labels on the PCA plot
+extracts_kit_id <- extract_sites_CDOM[,1]
+
+# change row names of data frame used for PCA
+# row.names(pca_extracts_cdom) <- pca_extracts_cdom
+# error message 
+
+# calculate the principal components
+pc <- prcomp(pca_extracts_cdom, scale = TRUE)
+
+# reverse signs of eigenvectors
+pc$rotation <- -1*pc$rotation
+
+# look at the principal components
+pc$rotation
+
+# reverse signs of each observation's principal components scores
+pc$x <- -1*pc$x
+
+# calculate variance represented by each of the principal components
+pc$sdev^2 / sum(pc$sdev^2)
+```
+
+```{r}
+## preliminary PCA plots
+# visualize the PCA
+biplot(pc, scale = 0)
+
+# add data about transect location
+pca_plot <- autoplot(pc, data = extract_sites_CDOM, colour = 'transect_location', frame = T, size = 3, loadings = TRUE,
+         loadings.colour = 'black', loadings.label = TRUE)
+pca_plot
+#pca_plot + scale_fill_manual(values = palette) + scale_color_manual(values= palette)
+
+# try kit id
+autoplot(pc, data = extract_sites_CDOM, colour = 'kit_id', size = 3, loadings = TRUE,
+         loadings.colour = 'black', loadings.label = TRUE)
+# no cluster pattern here
+```
+
+```{r}
+## customize plots with ggplot
+# pull out needed info
+pc_df <- data.frame(pc$x, transect_location = extract_sites_CDOM$transect_location)
+
+# ggplot
+ggplot(pc_df, aes(x = PC1, y = PC2, color = transect_location)) +
+  geom_point() +
+  scale_color_manual(values = palette)
+```
+
