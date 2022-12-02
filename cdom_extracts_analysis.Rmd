@@ -190,3 +190,18 @@ ggplot(pc_df, aes(x = PC1, y = PC2, color = transect_location)) +
   scale_color_manual(values = palette)
 ```
 
+## Correlations between CDOM Spectral Metrics
+
+```{r}
+cdom_corr <- pca_extracts_cdom
+cdom_groups <- extract_sites_CDOM[,2]
+
+# correlation scatter plot
+ggpairs(cdom_corr, ggplot2::aes(color = cdom_groups),
+        #lower = list(continuous = "smooth"), # adds lm line to the scatterplots
+        columnLabels = c("Bulk Density (g/cm3)", "LOI (%)", "GWC (%)",
+                         "Total Carbon (%)", "WSOC (mg/g soil)")) +
+  ggplot2::scale_fill_manual(values = palette) +
+  ggplot2::scale_color_manual(values = palette)
+```
+
