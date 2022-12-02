@@ -136,6 +136,23 @@ ggplot(wsom_extracts) +
 kt_wsoc <- kruskal.test(wsoc_conc ~ transect_location, data = wsom_extracts)
 dunn_test(wsom_extracts, wsoc_conc ~ transect_location)
 
+# boxplot for WSOC per g moist soil by transect location
+# testing to see if true field conditions shows a difference
+ggplot(wsom_extracts) +
+  geom_boxplot(aes(x = transect_location, y = wsoc_conc_field, fill = transect_location),
+               show.legend = FALSE) +
+  scale_fill_manual(values = palette) +
+  labs(x = "Location", y = "WSOC Concentration (mg/g field moist soil)")
+
+# non-parametric ANOVA for field moist concentrations
+kt_wsoc <- kruskal.test(wsoc_conc_field ~ transect_location, data = wsom_extracts)
+dunn_test(wsom_extracts, wsoc_conc_field ~ transect_location)
+
+# still not a statistically significant difference - almost uplands vs the other two
+# one value missing because of missing GWC but definitely outlier site
+```
+
+```{r}
 # test line graph to look at changes across the transect in WSOC
 a <- ggplot(wsom_extracts, aes(x = transect_location, y = wsoc_conc, color = kit_id,
                           group = kit_id)) +
@@ -261,6 +278,9 @@ summary(wsoc_tc)
 # model w/o location
 lm(wsoc_conc ~ tc_perc, data = wsom_extracts) %>%
   summary()
+
+lm(wsoc_conc~ tc_perc + transect_location + region, wsom_extracts) %>%
+  summary()
 ```
 
 ### Relationship between Total Nitrogen % and WSON
@@ -276,3 +296,16 @@ ggplot(wsom_extracts, aes(x = tn_perc, y = wson_conc)) +
 
 ## WSOM and Surface Water DOM
 
+### Relationship between Soil WSOM at Different Transect Location and Aquatic DOM
+
+```{r}
+ggplot(wsom_extracts, aes(x=wsoc_conc, y=water_npoc_mgl, color = transect_location)) +
+  geom_point()+
+  scale_color_manual(values = palette) +
+  facet_wrap(~transect_location)
+
+ggplot(wsom_extracts, aes(x=tc_perc, y = water_npoc_mgl, color = transect_location)) +
+  geom_point() +
+  scale_color_manual(values = palette) +
+  facet_wrap(~transect_location)
+```
