@@ -27,17 +27,41 @@ water_soil <- read_rds(paste0(data_location, "/EC1_water_soil_data.rds"))
 site_coordinates <- read_rds(paste0(data_location, 
                                     "/sample_collection_coordinates.rds"))
 wsom_conc <- read_rds(paste0(data_location, "/wsom_conc.rds"))
+
+# change region name for Chesapeake to Mid-Atlantic (for figures)
+water_soil <- water_soil %>%
+  mutate(region = ifelse(region == "Chesapeake Bay", "Mid-Atlantic", "Great Lakes"))
 ```
 
 ## Set-Up
 
+```{r, echo=FALSE, include=FALSE, message=FALSE, warning=FALSE, eval=FALSE}
+# set up fonts for figures
+#install.packages("showtext")
+#library(showtext)
+
+# check available fonts to import
+#font_files()
+
+# pull in cambria
+#font_add("Cambria", regular = "C:/Windows/Fonts/cambria.ttc", italic = "C:/Windows/Fonts/cambriai.ttf", bold = "C:/Windows/Fonts/cambriab.ttf")
+```
+
 ```{r}
 # set ggplot theme - remove dark background
-theme_set(theme_bw())
+theme_set(theme_bw() +
+            theme(text = element_text(family = "serif"),
+                  axis.title = element_text(size = 22),
+                  axis.text = element_text(size = 20),
+                  legend.text = element_text(size = 20),
+                  legend.title = element_text(size = 22)))
 
 # create color palette
 palette <- c("#056009","#0385B5","#021677","#ABABD9","#27220F","#8E7941",
              "#DCCD6A","#8F8D90")
+
+# destination for figure output
+output_directory <- "./Saved Figures"
 ```
 
 ## Map Figures
@@ -82,20 +106,28 @@ extracts_gps <- site_coordinates %>%
 # just plot water for general site locations
 ggplot(data = gl) +
   geom_sf(fill = "#EEEEEE") +
-  coord_sf(xlim = c(-92,-74), ylim = c(37,48)) +
+  coord_sf(xlim = c(-92,-74), ylim = c(37,47)) +
   geom_point(data = filter(extracts_gps, transect_location == "Water"), 
-             mapping = aes(x = longitude, y = latitude)) +
+             mapping = aes(x = longitude, y = latitude),
+             color = "#021677", size = 2.5) +
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) +
-  labs(x = "Longitude", y = "Latitude")
+  labs(x = "", y = "")
+
+# export map for presentation
+ggsave("site_map.png", plot = last_plot(), path = output_directory)
 
 # zoom in on chesapeake and plot the full transect
 ggplot(data = gl) +
   geom_sf(fill = "#EEEEEE") +
-  coord_sf(xlim = c(-78,-74), ylim = c(37,40.5)) +
-  geom_point(data = extracts_gps, mapping = aes(x = longitude, y = latitude, 
-                                                color = transect_location)) +
-  labs(x = "Longitude", y = "Latitude") +
+  coord_sf(xlim = c(-78,-75), ylim = c(37,40)) +
+  geom_point(data = extracts_gps, mapping = aes(x = longitude, y = latitude),
+             color = "#021677", size = 2.5) +
+  scale_x_continuous(breaks = seq(-78,-75, by = 1)) +
+  labs(x = "", y = "") +
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+# export map
+ggsave("chesapeake_site_map.png", plot = last_plot(), path = output_directory)
 ```
 
 ## Patterns in WSOC and WSON
@@ -180,6 +212,10 @@ ggplot(wsom_extracts) +
 # non-parametric ANOVA
 kt_wsoc_region <- kruskal.test(wsoc_conc ~ region, data = wsom_extracts)
 dunn_test(wsom_extracts, wsoc_conc ~ region)
+
+# friedman test - equivalent of 2-way ANOVA
+friedman.test(wsoc_conc ~ transect_location | region, data = wsom_extracts)
+
 ```
 
 ```{r}
