@@ -31,6 +31,7 @@ wsom_conc <- read_rds(paste0(data_location, "/wsom_conc.rds"))
 # change region name for Chesapeake to Mid-Atlantic (for figures)
 water_soil <- water_soil %>%
   mutate(region = ifelse(region == "Chesapeake Bay", "Mid-Atlantic", "Great Lakes"))
+water_soil$region <- as.factor(water_soil$region)
 ```
 
 ## Set-Up
@@ -51,10 +52,10 @@ water_soil <- water_soil %>%
 # set ggplot theme - remove dark background
 theme_set(theme_bw() +
             theme(text = element_text(family = "serif"),
-                  axis.title = element_text(size = 22),
-                  axis.text = element_text(size = 20),
-                  legend.text = element_text(size = 20),
-                  legend.title = element_text(size = 22)))
+                  axis.title = element_text(size = 20),
+                  axis.text = element_text(size = 18),
+                  legend.text = element_text(size = 18),
+                  legend.title = element_text(size = 20)))
 
 # create color palette
 palette <- c("#056009","#0385B5","#021677","#ABABD9","#27220F","#8E7941",
@@ -156,13 +157,15 @@ ggplot(wsom_extracts, aes(x = wson_conc)) +
 # move forward using non-parametric statistical tests
 ```
 
-```{r}
+```{r, warning = FALSE}
 # boxplot for WSOC by transect location
 ggplot(wsom_extracts) +
   geom_boxplot(aes(x = transect_location, y = wsoc_conc, fill = transect_location),
                show.legend = FALSE) +
   scale_fill_manual(values = palette) +
-  labs(x = "Location", y = "WSOC Concentration (mg/g soil)")
+  labs(x = "Gradient Location", y = "WSOC Concentration (mg/g soil)")
+
+ggsave("wsoc_location_boxplot.png", path = output_directory)
 
 # non-parametric ANOVA
 kt_wsoc <- kruskal.test(wsoc_conc ~ transect_location, data = wsom_extracts)
@@ -174,7 +177,7 @@ ggplot(wsom_extracts) +
   geom_boxplot(aes(x = transect_location, y = wsoc_conc_field, fill = transect_location),
                show.legend = FALSE) +
   scale_fill_manual(values = palette) +
-  labs(x = "Location", y = "WSOC Concentration (mg/g field moist soil)")
+  labs(x = "Gradient Location", y = "WSOC Concentration (mg/g field soil)")
 
 # non-parametric ANOVA for field moist concentrations
 kt_wsoc <- kruskal.test(wsoc_conc_field ~ transect_location, data = wsom_extracts)
@@ -212,10 +215,55 @@ ggplot(wsom_extracts) +
 # non-parametric ANOVA
 kt_wsoc_region <- kruskal.test(wsoc_conc ~ region, data = wsom_extracts)
 dunn_test(wsom_extracts, wsoc_conc ~ region)
+```
+
+```{r}
+# setting up data for friedman test - needs to be a "blocked" design
+wsoc_friedman <- wsom_extracts %>%
+  select(c(wsoc_conc, transect_location, region))
 
 # friedman test - equivalent of 2-way ANOVA
-friedman.test(wsoc_conc ~ transect_location | region, data = wsom_extracts)
+friedman.test(wsoc_conc ~ transect_location | region, data = wsoc_friedman)
 
+# data is not structured correctly for friedman test - not equivalent to a two-way ANOVA - data needs to be from a nonreplicated block design, meaning one observation per intersection of the two variables
+```
+
+```{r}
+# trying multiple Mann-Whitney U tests to test differences between combos of region and transect location
+upland_gl <- wsom_extracts %>%
+  filter(region == "Great Lakes" & transect_location == "Upland") %>%
+  select(wsoc_conc)
+colnames(upland_gl) <- "up_gl_wsoc"
+
+transition_gl <- wsom_extracts %>%
+  filter(region == "Great Lakes" & transect_location == "Transition") %>%
+  select(wsoc_conc)
+colnames(transition_gl) <- "t_gl_wsoc"
+
+wetland_gl <- wsom_extracts %>%
+  filter(region == "Great Lakes" & transect_location == "Wetland") %>%
+  select(wsoc_conc)
+colnames(wetland_gl) <- "w_gl_wsoc"
+
+upland_ma <- wsom_extracts %>%
+  filter(region == "Mid-Atlantic" & transect_location == "Upland") %>%
+  select(wsoc_conc)
+colnames(upland_ma) <- "up_ma_wsoc"
+
+transition_ma <- wsom_extracts %>%
+  filter(region == "Mid-Atlantic" & transect_location == "Transition") %>%
+  select(wsoc_conc)
+colnames(transition_ma) <- "t_ma_wsoc"
+
+wetland_ma <- wsom_extracts %>%
+  filter(region == "Mid-Atlantic" & transect_location == "Wetland") %>%
+  select(wsoc_conc)
+colnames(wetland_ma) <- "w_ma_wsoc"
+
+grouped_wsoc_conc <- upland_gl
+grouped_wsoc_conc$t_gl_wsoc <- transition_gl$t_gl_wsoc
+grouped_wsoc_conc$w_gl_wsoc <- wetland_gl$w_gl_wsoc
+grouped_wsoc_conc$up_ma_wsoc <- upland_ma$up_ma_wsoc
 ```
 
 ```{r}
@@ -223,7 +271,7 @@ friedman.test(wsoc_conc ~ transect_location | region, data = wsom_extracts)
 ggplot(data = wsom_extracts, aes(x = transect_location, y = tc_perc, fill = transect_location)) +
   geom_boxplot(show.legend = FALSE) +
   scale_fill_manual(values=palette) +
-  labs(x = "Transect Location", y = "Total Carbon %")
+  labs(x = "Gradient Location", y = "Total Carbon %")
 
 # kruskal-wallis test
 kt_tc <- kruskal.test(tc_perc ~ transect_location, wsom_extracts)
@@ -295,13 +343,17 @@ ggpairs(wsoc_corr, ggplot2::aes(color = groups),
 # soil TC vs WSOC plot
 ggplot(wsom_extracts, aes(x = tc_perc, y = wsoc_conc)) +
   geom_smooth(formula = y~x, method = "lm", se = FALSE, color = palette[8]) +
-  labs(x = "Soil Total Carbon %", y = "WSOC Concentration (mg/g soil)", color = "Location") +
+  labs(x = "Soil Total Carbon %", y = "WSOC Concentration (mg/g soil)", color = "Gradient Location") +
   scale_color_manual(values = palette) +  
   geom_point(aes(color = transect_location), size = 2.5) +
-  stat_regline_equation(aes(label = ..rr.label..))
+  stat_regline_equation(aes(label = ..rr.label..), size = 5)
 
 # stat_regline_equation is part of the ggpubr package
-# can also put the full equation, AIC, BIC...
+# can also put the full equation (label = ..eq.label..), AIC, BIC...
+
+# save plot
+ggsave("wsoc_tc_scatter.png", plot = last_plot(), path = output_directory,
+       width = 7, height = 5)
 ```
 
 ```{r}
@@ -316,6 +368,31 @@ lm(wsoc_conc ~ tc_perc, data = wsom_extracts) %>%
   summary()
 
 lm(wsoc_conc~ tc_perc + transect_location + region, wsom_extracts) %>%
+  summary()
+```
+
+### Relationship between WSOC and LOI
+
+```{r}
+ggplot(wsom_extracts, aes(x = loi_perc, y = wsoc_conc)) +
+  geom_smooth(formula = y~x, method = "lm", se = FALSE, color = palette[8]) +
+  labs(x = "Loss on Ignition (%)", y = "WSOC Concentration (mg/g soil)", color = "Gradient Location") +
+  scale_color_manual(values = palette) +  
+  geom_point(aes(color = transect_location), size = 2.5) +
+  stat_regline_equation(aes(label = ..rr.label..), size = 5)
+
+ggsave("wsoc_loi.png", plot = last_plot(), path = output_directory,
+       width = 7, height = 5)
+```
+
+```{r}
+lm(wsoc_conc ~ loi_perc, data = wsom_extracts) %>%
+  summary()
+
+lm(wsoc_conc ~ loi_perc + transect_location, data = wsom_extracts) %>%
+  summary()
+
+lm(wsoc_conc ~ loi_perc + transect_location + region, data = wsom_extracts) %>%
   summary()
 ```
 
