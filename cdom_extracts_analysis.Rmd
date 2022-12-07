@@ -17,27 +17,37 @@ packages_list <- c("tidyverse", "broom", "ggpubr", "ggfortify")
 lapply(packages_list, library, character.only = TRUE)
 
 # set data files location
-data_location = paste0(getwd(), "/Original Data Files")
+cdom_data_location = paste0(getwd(), "/Original Data Files")
 
 # csv files for CDOM data
-water_cdom_peaks <- read_csv(paste0(data_location, "/EC1_Water_CDOM_DOCnormalizedpeakpicks_20221011.csv"))
-water_cdom_indices <- read_csv(paste0(data_location, "/EC1_Water_CDOM_SpectralIndices_20221011.csv"))
+water_cdom_peaks <- read_csv(paste0(cdom_data_location, "/EC1_Water_CDOM_DOCnormalizedpeakpicks_20221011.csv"))
+water_cdom_indices <- read_csv(paste0(cdom_data_location, "/EC1_Water_CDOM_SpectralIndices_20221011.csv"))
 
-extracts_cdom_peaks <- read_csv(paste0(data_location,
+extracts_cdom_peaks <- read_csv(paste0(cdom_data_location,
                                        "/EC1_WSOC_Extracts_Nov2022_PeakPicks_DOCnormalized.csv"))
-extracts_cdom_indices <- read_csv(paste0(data_location, "/EC1_WSOC_Extracts_Nov2022_SpectralIndices.csv"))
+extracts_cdom_indices <- read_csv(paste0(cdom_data_location, "/EC1_WSOC_Extracts_Nov2022_SpectralIndices.csv"))
 ```
 
 ## Set-Up
 
 ```{r}
 # set ggplot theme - remove dark background
-theme_set(theme_bw())
+theme_set(theme_bw() +
+             theme(text = element_text(family = "serif"),
+                  axis.title = element_text(size = 20),
+                  axis.text = element_text(size = 18),
+                  legend.text = element_text(size = 18),
+                  legend.title = element_text(size = 20)))
 
 # create color palette
 palette <- c("#056009","#0385B5","#021677","#ABABD9","#27220F","#8E7941",
              "#DCCD6A","#8F8D90")
+
+# set location for saved figures
+output_directory <- "./Saved Figures"
 ```
+
+## Data Preparation
 
 ```{r}
 # data frame edits
@@ -123,14 +133,28 @@ extracts_cdom <- extracts_cdom_original %>%
 water_cdom <- water_cdom[,-2]
 extract_sites_CDOM <- rbind(extracts_cdom, filter(water_cdom, water_cdom$kit_id %in% extracts_cdom$kit_id))
 
-# group by kit to make it easier to look at!!
+```
+
+```{r}
+# bring in metadata to get location information for the kits
+water_soil <- read_rds("./R Data Files/EC1_water_soil_data.rds")
+
+# change region name for Chesapeake to Mid-Atlantic (for figures)
+water_soil <- water_soil %>%
+  mutate(region = ifelse(region == "Chesapeake Bay", "Mid-Atlantic", "Great Lakes"))
+water_soil$region <- as.factor(water_soil$region)
+
+# merge info with cdom data
+water_soil_location <- water_soil %>%
+  select(kit_id, state, region, water_body, water_systemtype)
+
+extract_sites_CDOM <- left_join(extract_sites_CDOM, water_soil_location, by = "kit_id")
+extract_sites_CDOM <- unique(extract_sites_CDOM)
+
+# relevel transect_location
 extract_sites_CDOM$kit_id <- as.factor(extract_sites_CDOM$kit_id)
 extract_sites_CDOM$transect_location <- factor(extract_sites_CDOM$transect_location,
-                                               levels = c("Upland", "Transition", "Wetland",
-                                                          "Water"))
-
-extract_sites_CDOM <- extract_sites_CDOM %>%
-  group_by(kit_id)
+                                               levels = c("Upland", "Transition", "Wetland", "Water"))
 ```
 
 ## Preliminary PCA
@@ -169,39 +193,74 @@ biplot(pc, scale = 0)
 
 # add data about transect location
 pca_plot <- autoplot(pc, data = extract_sites_CDOM, colour = 'transect_location', frame = T, size = 3, loadings = TRUE,
-         loadings.colour = 'black', loadings.label = TRUE)
+         loadings.colour = 'black', loadings.label = TRUE,
+         loadings.label.color = 'black')
 pca_plot
-#pca_plot + scale_fill_manual(values = palette) + scale_color_manual(values= palette)
+pca_plot + scale_fill_manual(values = palette) + 
+  scale_color_manual(values= palette) +
+  labs(color = "Gradient Location", fill = "Gradient Location")
 
 # try kit id
 autoplot(pc, data = extract_sites_CDOM, colour = 'kit_id', size = 3, loadings = TRUE,
          loadings.colour = 'black', loadings.label = TRUE)
 # no cluster pattern here
+
+# try region and transect location
+autoplot(pc, data = extract_sites_CDOM, size = 3, frame = T,
+         shape = 'region', loadings.colour = "black", loadings.label = TRUE)
 ```
 
 ```{r}
 ## customize plots with ggplot
 # pull out needed info
-pc_df <- data.frame(pc$x, transect_location = extract_sites_CDOM$transect_location)
+pc_df <- data.frame(pc$x, transect_location = extract_sites_CDOM$transect_location,
+                    region = extract_sites_CDOM$region)
 
 # ggplot
-ggplot(pc_df, aes(x = PC1, y = PC2, color = transect_location)) +
-  geom_point() +
+ggplot(pc_df, aes(x = PC1, y = PC2, color = transect_location, shape = region)) +
+  geom_point(size = 2.5) +
   scale_color_manual(values = palette)
 ```
 
+## Rerun PCA with only FRESH to reduce loadings
+
+
 ## Correlations between CDOM Spectral Metrics
 
-```{r}
+```{r, message = FALSE, warning = FALSE}
 cdom_corr <- pca_extracts_cdom
-cdom_groups <- extract_sites_CDOM[,2]
+cdom_groups <- as.data.frame(extract_sites_CDOM[,2])
 
 # correlation scatter plot
-ggpairs(cdom_corr, ggplot2::aes(color = cdom_groups),
+ggpairs(cdom_corr, ggplot2::aes(color = cdom_groups$transect_location),
         #lower = list(continuous = "smooth"), # adds lm line to the scatterplots
-        columnLabels = c("Bulk Density (g/cm3)", "LOI (%)", "GWC (%)",
-                         "Total Carbon (%)", "WSOC (mg/g soil)")) +
+        columnLabels = c("SUVA 254 nm", "Spectral Slope 275-295 nm", "Spectral Slope 350-400 nm",
+                         "Slope Ratio", "E2 to E3", "FI", "HIX", "FRESH", "BIX")) +
   ggplot2::scale_fill_manual(values = palette) +
   ggplot2::scale_color_manual(values = palette)
+```
+
+## Plotting Specific Metrics
+
+```{r}
+# two absorbance metrics
+ggplot(extract_sites_CDOM, aes(x = SUVA254, y = S350_400, color = transect_location)) +
+  geom_point(size = 2.5) +
+  scale_color_manual(values = palette) +
+  labs(x = "SUVA at 254 nm", y = "Spectral Slope 350-400 nm", color = "Gradient Location")
+
+ggsave("SUVA254_S350_400.png", path = output_directory,
+       height = 5, width = 7)
+```
+
+```{r}
+# two fluorescence metrics
+ggplot(extract_sites_CDOM, aes(x = FI, y = FRESH, color = transect_location)) +
+  geom_point(size = 2.5) +
+  scale_color_manual(values = palette) +
+  labs(x = "Fluorescense Index", y = "Freshness Index", color = "Gradient Location")
+
+ggsave("FI_FRESH.png", path = output_directory,
+       height = 5, width = 7)
 ```
 
