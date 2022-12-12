@@ -153,8 +153,13 @@ ggplot(wsom_extracts, aes(x = wsoc_conc)) +
 ggplot(wsom_extracts, aes(x = wson_conc)) +
   geom_density()
 
-# both are non-normally distributed (gamma distribution)
+# both are non-normally distributed (gamma distribution/positively skewed)
 # move forward using non-parametric statistical tests
+
+# attempt a natural log transformation for wsoc_conc
+wsom_extracts$wsoc_conc_trans <- log(wsom_extracts$wsoc_conc)
+ggplot(wsom_extracts, aes(x = wsoc_conc_trans)) +
+  geom_density()
 ```
 
 ```{r, warning = FALSE}
@@ -206,64 +211,60 @@ ggarrange(a,b, ncol = 1,
 ```
 
 ```{r}
-# boxplot for WSOC regionally
+# boxplot for WSOC region and transect location
 ggplot(wsom_extracts) +
-  geom_boxplot(aes(x = region, y = wsoc_conc, fill = transect_location)) +
-  scale_fill_manual(values = palette) +
-  labs(x = "Region", y = "WSOC Concentration (mg/g soil)", fill = "Transect Location")
+  geom_boxplot(aes(x = region, y = wsoc_conc, color = transect_location), lwd = 1, fatten = 1, outlier.shape = NA,
+               width = 0.5) +
+  labs(x = "Region", y = "WSOC Concentration (mg/g soil)", color = "Gradient Location") + 
+  geom_point(aes(x = region, y = wsoc_conc, color = transect_location), position = position_jitterdodge(), size = 2) +
+  scale_color_manual(values = palette)
+
+ggsave("wsoc_conc_region_location.png", path = output_directory, width = 7, height = 5)
 
 # non-parametric ANOVA
 kt_wsoc_region <- kruskal.test(wsoc_conc ~ region, data = wsom_extracts)
 dunn_test(wsom_extracts, wsoc_conc ~ region)
+
+# parametric ANOVA with transformed concentrations
+aov(wsoc_conc_trans ~ region + transect_location, data = wsom_extracts) %>%
+  summary()
+# effects of region and transect_location are not statistically significant
+
+# try with interaction
+aov(wsoc_conc_trans ~ region + transect_location + region:transect_location, data = wsom_extracts) %>%
+  summary()
+# interaction effect not significant either
+```
+
+```{r}
+# plot water DOC just for a little comparison
+surface_water <- wsom_extracts %>%
+  select(kit_id, water_npoc_mgl, region)
+surface_water <- unique(surface_water)
+surface_water$transect_location <- "Water"
+surface_water$transect_location <- as.factor(surface_water$transect_location)
+
+ggplot(surface_water, aes(x = region, y = water_npoc_mgl, color = transect_location)) +
+  geom_boxplot(lwd = 1, fatten = 1,
+                width = 0.5/length(unique(wsom_extracts$transect_location))) +
+  geom_point(position = position_jitterdodge(), size = 2) +
+  scale_color_manual(values = palette[4]) +
+  labs(color = "", x = "", y = "DOC Concentration (mg/L)")
+
+ggsave("water_doc.png", path = output_directory, 
+       width = 7, height = 5)
 ```
 
 ```{r}
 # setting up data for friedman test - needs to be a "blocked" design
-wsoc_friedman <- wsom_extracts %>%
-  select(c(wsoc_conc, transect_location, region))
+#wsoc_friedman <- wsom_extracts %>%
+  #select(c(wsoc_conc, transect_location, region))
 
 # friedman test - equivalent of 2-way ANOVA
-friedman.test(wsoc_conc ~ transect_location | region, data = wsoc_friedman)
+#friedman.test(wsoc_conc ~ transect_location | region, data = wsoc_friedman)
 
 # data is not structured correctly for friedman test - not equivalent to a two-way ANOVA - data needs to be from a nonreplicated block design, meaning one observation per intersection of the two variables
-```
-
-```{r}
-# trying multiple Mann-Whitney U tests to test differences between combos of region and transect location
-upland_gl <- wsom_extracts %>%
-  filter(region == "Great Lakes" & transect_location == "Upland") %>%
-  select(wsoc_conc)
-colnames(upland_gl) <- "up_gl_wsoc"
-
-transition_gl <- wsom_extracts %>%
-  filter(region == "Great Lakes" & transect_location == "Transition") %>%
-  select(wsoc_conc)
-colnames(transition_gl) <- "t_gl_wsoc"
-
-wetland_gl <- wsom_extracts %>%
-  filter(region == "Great Lakes" & transect_location == "Wetland") %>%
-  select(wsoc_conc)
-colnames(wetland_gl) <- "w_gl_wsoc"
-
-upland_ma <- wsom_extracts %>%
-  filter(region == "Mid-Atlantic" & transect_location == "Upland") %>%
-  select(wsoc_conc)
-colnames(upland_ma) <- "up_ma_wsoc"
-
-transition_ma <- wsom_extracts %>%
-  filter(region == "Mid-Atlantic" & transect_location == "Transition") %>%
-  select(wsoc_conc)
-colnames(transition_ma) <- "t_ma_wsoc"
-
-wetland_ma <- wsom_extracts %>%
-  filter(region == "Mid-Atlantic" & transect_location == "Wetland") %>%
-  select(wsoc_conc)
-colnames(wetland_ma) <- "w_ma_wsoc"
-
-grouped_wsoc_conc <- upland_gl
-grouped_wsoc_conc$t_gl_wsoc <- transition_gl$t_gl_wsoc
-grouped_wsoc_conc$w_gl_wsoc <- wetland_gl$w_gl_wsoc
-grouped_wsoc_conc$up_ma_wsoc <- upland_ma$up_ma_wsoc
+# retraced steps and transformed the variable to be approx. normal for two way test
 ```
 
 ```{r}
@@ -295,6 +296,22 @@ ggplot(wsom_extracts) +
                show.legend = FALSE) +
   scale_fill_manual(values = palette) +
   labs(x = "Location", y = "WSON Concentration (mg/g soil)")
+```
+
+```{r}
+# summary stat calculations for results reporting
+sum_wsom <- wsom_extracts %>%
+  select(region, transect_location, wsoc_conc)
+sum_wsom <- sum_wsom %>%
+  group_by(region, transect_location) %>%
+  summarize(mean = mean(wsoc_conc), sd = sd(wsoc_conc), n = n())
+sum_wsom$se <- sum_wsom$sd/(sqrt(sum_wsom$n))
+
+sum_doc <- surface_water %>%
+  group_by(region) %>%
+  summarize(mean = mean(water_npoc_mgl), sd = sd(water_npoc_mgl), n = n())
+sum_doc$se <- sum_doc$sd/(sqrt(sum_doc$n))
+  
 ```
 
 ## WSOM and Other Soil Characteristics
