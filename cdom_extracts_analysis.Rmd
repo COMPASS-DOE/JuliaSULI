@@ -12,7 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r, message=FALSE, echo =FALSE, warning = FALSE}
 # required packages
-packages_list <- c("tidyverse", "broom", "ggpubr", "ggfortify")
+packages_list <- c("tidyverse", "broom", "ggpubr", "ggfortify", "GGally")
 
 lapply(packages_list, library, character.only = TRUE)
 
@@ -45,6 +45,26 @@ palette <- c("#056009","#0385B5","#021677","#ABABD9","#27220F","#8E7941",
 
 # set location for saved figures
 output_directory <- "./Saved Figures"
+```
+
+## Aqualog Abs Data Figure
+
+```{r}
+abs_path <- "C:/Users/mcel487/OneDrive - PNNL/Documents/SULI Project 2022/CDOM Data/EC1_WSOC_Extracts_CDOM_processed/5. Corrected Absorbance Files_ESS_DIVE/K035 UP_DilCorr_Abs.dat"
+
+# precheck to look at data format
+readLines(abs_path, n = 10)
+
+abs_spectra <- read.delim(abs_path, header = TRUE, sep = "\t")
+
+# plot
+ggplot(abs_spectra, aes(x = Wavelength..nm., y = Dilution.Corrected.Absorbance)) +
+  geom_line() +
+  labs(x = "Wavelength (nm)", y = "Absorbance") +
+  scale_x_continuous(breaks = seq(200, 800, by = 100))
+
+ggsave("abs_spectra.png", path = output_directory,
+       width = 7, height = 5)
 ```
 
 ## Data Preparation
@@ -194,7 +214,7 @@ biplot(pc, scale = 0)
 # add data about transect location
 pca_plot <- autoplot(pc, data = extract_sites_CDOM, colour = 'transect_location', frame = T, size = 3, loadings = TRUE,
          loadings.colour = 'black', loadings.label = TRUE,
-         loadings.label.color = 'black')
+         loadings.label.colour = 'black')
 pca_plot
 pca_plot + scale_fill_manual(values = palette) + 
   scale_color_manual(values= palette) +
@@ -210,7 +230,43 @@ autoplot(pc, data = extract_sites_CDOM, size = 3, frame = T,
          shape = 'region', loadings.colour = "black", loadings.label = TRUE)
 ```
 
+## Rerun PCA with only FRESH to reduce loadings
+
 ```{r}
+# calculate the principal components
+pc2 <- prcomp(pca_extracts_cdom[,c(1,3,6:8)], scale = TRUE)
+
+# reverse signs of eigenvectors
+pc2$rotation <- -1*pc2$rotation
+
+# reverse signs of each observation's principal components scores
+pc2$x <- -1*pc2$x
+
+# calculate variance represented by each of the principal components
+pc2$sdev^2 / sum(pc2$sdev^2)
+```
+
+```{r}
+# plot the new PCA
+new_pca_plot <- autoplot(pc2, data = extract_sites_CDOM, colour = 'transect_location',
+                         shape = 'region',
+                         frame = T, size = 3, loadings = TRUE,
+         loadings.colour = 'black', loadings.size = 3, loadings.label = TRUE,
+         loadings.label.colour = 'black',
+         loadings.label.hjust = 1.1, loadings.label.vjust = 1.5,
+         loadings.label.size = 5.5)
+
+new_pca_plot + scale_fill_manual(values = palette) + 
+  scale_color_manual(values= palette) +
+  labs(color = "Gradient Location", fill = "Gradient Location", shape = "Region")
+
+ggsave("cdom_pca.png", path = output_directory,
+       width = 9, height = 5)
+
+```
+
+```{r}
+# work more with ggplot and clustering analysis
 ## customize plots with ggplot
 # pull out needed info
 pc_df <- data.frame(pc$x, transect_location = extract_sites_CDOM$transect_location,
@@ -220,10 +276,23 @@ pc_df <- data.frame(pc$x, transect_location = extract_sites_CDOM$transect_locati
 ggplot(pc_df, aes(x = PC1, y = PC2, color = transect_location, shape = region)) +
   geom_point(size = 2.5) +
   scale_color_manual(values = palette)
+
+# set up for clustering 
+# https://stackoverflow.com/questions/20260434/test-significance-of-clusters-on-a-pca-plot
+scores <- pc2$x[,1:3]                        # scores for first three PC's
+
+# k-means clustering
+km     <- kmeans(scores, centers=4, nstart=5)
+ggdata <- data.frame(scores, Cluster=km$cluster, location=extract_sites_CDOM$transect_location,
+                     region = extract_sites_CDOM$region)
+
+ggplot(ggdata) +
+  geom_point(aes(x=PC1, y=PC2, color=factor(location),shape=factor(region)), size=2.5) +
+  stat_ellipse(aes(x=PC1,y=PC2,fill=factor(Cluster)),
+               geom="polygon", level=0.95, alpha=0.2) +
+  guides(color=guide_legend("location"),fill=guide_legend("Cluster"))
+
 ```
-
-## Rerun PCA with only FRESH to reduce loadings
-
 
 ## Correlations between CDOM Spectral Metrics
 
@@ -240,7 +309,7 @@ ggpairs(cdom_corr, ggplot2::aes(color = cdom_groups$transect_location),
   ggplot2::scale_color_manual(values = palette)
 ```
 
-## Plotting Specific Metrics
+## Pulling Specific Metrics
 
 ```{r}
 # two absorbance metrics
@@ -262,5 +331,76 @@ ggplot(extract_sites_CDOM, aes(x = FI, y = FRESH, color = transect_location)) +
 
 ggsave("FI_FRESH.png", path = output_directory,
        height = 5, width = 7)
+```
+
+### Summary Stats for FRESH, FI, HIX, SUVA254, and S350_400
+
+```{r}
+CDOM_sum_mean <- extract_sites_CDOM %>%
+  select(transect_location, SUVA254, S350_400, FI, FRESH, HIX) %>%
+  group_by(transect_location) %>%
+  summarize(across(everything(), mean))
+
+colnames(CDOM_sum_mean)[-1] <- paste0(colnames(CDOM_sum_mean)[-1], "_mean")
+
+CDOM_sum_sd <- extract_sites_CDOM %>%
+  select(transect_location, SUVA254, S350_400, FI, FRESH, HIX) %>%
+  group_by(transect_location) %>%
+  summarize(across(everything(), sd))
+
+# calculate standard error
+CDOM_sum_se <- CDOM_sum_sd
+CDOM_sum_se[,c(2:6)] <- CDOM_sum_se[,c(2:6)]/sqrt(10)   # each transect location has 10 samples
+
+colnames(CDOM_sum_se)[-1] <- paste0(colnames(CDOM_sum_se)[-1], "_se")
+```
+
+```{r}
+# boxplots for indices across the gradient
+SUVA <- ggplot(extract_sites_CDOM, aes(x = transect_location, y = SUVA254, color = transect_location)) +
+  geom_boxplot(lwd = 1, fatten = 1,
+               outlier.shape = NA, show.legend = FALSE) +
+  geom_point(position = position_jitterdodge(), size = 2, show.legend = FALSE) +
+  scale_color_manual(values = palette) +
+  labs(x = "Gradient Location", y = "SUVA at 254 nm (L/mg C*m)", color = "") +
+  theme(axis.title.x = element_blank(),     
+        axis.text.x = element_blank())    # remove the axis labels and ticks for common axis in ggarrange()
+
+SS <- ggplot(extract_sites_CDOM, aes(x = transect_location, y = S350_400, color = transect_location)) +
+  geom_boxplot(lwd = 1, fatten = 1,
+               outlier.shape = NA, show.legend = FALSE) +
+  geom_point(position = position_jitterdodge(), size = 2, show.legend = FALSE) +
+  scale_color_manual(values = palette) +
+  labs(x = "Gradient Location", y = "Spectral Slope (350-400 nm)", color = "") +
+  theme(axis.title.x = element_blank(),     
+        axis.text.x = element_blank())
+
+FI <- ggplot(extract_sites_CDOM, aes(x = transect_location, y = FI, color = transect_location)) +
+  geom_boxplot(lwd = 1, fatten = 1,
+               outlier.shape = NA, show.legend = FALSE) +
+  geom_point(position = position_jitterdodge(), size = 2, show.legend = FALSE) +
+  scale_color_manual(values = palette) +
+  labs(x = "Gradient Location", y = "Fluorescence Index", color = "")
+
+FRESH <- ggplot(extract_sites_CDOM, aes(x = transect_location, y = FRESH, color = transect_location)) +
+  geom_boxplot(lwd = 1, fatten = 1,
+               outlier.shape = NA, show.legend = FALSE) +
+  geom_point(position = position_jitterdodge(), size = 2, show.legend = FALSE) +
+  scale_color_manual(values = palette) +
+  labs(x = "Gradient Location", y = "Freshness Index", color = "")
+
+HIX <- ggplot(extract_sites_CDOM, aes(x = transect_location, y = HIX, color = transect_location)) +
+  geom_boxplot(lwd = 1, fatten = 1,
+               outlier.shape = NA, show.legend = FALSE) +
+  geom_point(position = position_jitterdodge(), size = 2, show.legend = FALSE) +
+  scale_color_manual(values = palette) +
+  labs(x = "Gradient Location", y = "Humification Index", color = "")
+
+# pull all plots into one figure
+ggarrange(SUVA, SS, FI, FRESH, HIX,
+          labels ="AUTO", align = "hv")
+
+ggsave("cdom_indices_boxplots.png", path = output_directory,
+       width = 16, height = 9)
 ```
 
