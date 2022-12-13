@@ -12,7 +12,8 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r, message=FALSE, echo =FALSE, warning = FALSE}
 # required packages
-packages_list <- c("tidyverse", "broom", "ggpubr", "ggfortify", "GGally")
+packages_list <- c("tidyverse", "broom", "ggpubr", "ggfortify", "GGally",
+                   "rstatix")
 
 lapply(packages_list, library, character.only = TRUE)
 
@@ -402,5 +403,45 @@ ggarrange(SUVA, SS, FI, FRESH, HIX,
 
 ggsave("cdom_indices_boxplots.png", path = output_directory,
        width = 16, height = 9)
+```
+
+```{r}
+#checking normality for ANOVA
+ggplot(extract_sites_CDOM, aes(x = SUVA254, color = transect_location)) +
+  geom_density()
+ggplot(extract_sites_CDOM, aes(x = S350_400, color = transect_location)) +
+  geom_density()
+ggplot(extract_sites_CDOM, aes(x = FRESH, color = transect_location)) +
+  geom_density()
+ggplot(extract_sites_CDOM, aes(x = FI, color = transect_location)) +
+  geom_density()
+ggplot(extract_sites_CDOM, aes(x = HIX, color = transect_location)) +
+  geom_density()
+
+# no way to transform well either - tried ln() and log10() transformation with no success
+# proceeded with kruskal-wallis test
+```
+
+```{r}
+# kruskal-wallis tests for difference between transects for the indices
+# SUVA254
+kruskal.test(SUVA254 ~ transect_location, extract_sites_CDOM)
+dunn_test(extract_sites_CDOM, SUVA254 ~ transect_location, p.adjust.method = "holm")
+
+# S350-400
+kruskal.test(S350_400 ~ transect_location, extract_sites_CDOM)
+dunn_test(extract_sites_CDOM, S350_400 ~ transect_location, p.adjust.method = "holm")
+
+# FRESH
+kruskal.test(FRESH ~ transect_location, extract_sites_CDOM)
+dunn_test(extract_sites_CDOM, FRESH ~ transect_location, p.adjust.method = "holm")
+
+# FI
+kruskal.test(FI ~ transect_location, extract_sites_CDOM)
+dunn_test(extract_sites_CDOM, FI ~ transect_location, p.adjust.method = "holm")
+
+# HIX
+kruskal.test(HIX ~ transect_location, extract_sites_CDOM)
+dunn_test(extract_sites_CDOM, HIX ~ transect_location, p.adjust.method = "holm")
 ```
 
