@@ -287,6 +287,13 @@ ggplot(filter(water_soil, transect_location == "Upland"|transect_location == "Tr
 
 kt_tc_all <- kruskal.test(tc_perc ~ transect_location, water_soil)
 dunn_test(water_soil, tc_perc ~ transect_location)
+
+# calculate summary stats for total carbon
+tc_sum <- wsom_extracts %>%
+  select(transect_location, tc_perc) %>%
+  group_by(transect_location) %>%
+  summarize(mean = mean(tc_perc), sd = sd(tc_perc), n = n())
+tc_sum$se <- tc_sum$sd/sqrt(tc_sum$n)
 ```
 
 ```{r}
