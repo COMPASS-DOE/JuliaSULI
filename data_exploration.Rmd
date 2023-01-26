@@ -452,8 +452,8 @@ target_sites_filtered <- target_sites %>%
   filter(water_npoc_mgl < 25)
 
 # bring salinity data in!
-water_quality_crop <- water_quality[, c(2,4)]
-target_sites_filtered <- left_join(target_sites_filtered, water_quality_crop, by = "kit_id")
+water_quality <- read.csv("~/EC1_WaterQuality_L0B_20220509.csv")
+target_sites_filtered <- left_join(target_sites_filtered, water_quality, by = "kit_id")
 
 # map target sites to get a feel for spatial layout
 # chesapeake region
@@ -522,5 +522,62 @@ sites_transition <- extract_sites %>%
 
 sites_wetland <- extract_sites %>%
   filter(transect_location == "Wetland")
+```
+
+```{r}
+# old vs new selected sites
+final_extract_sites <- target_sites_filtered %>%
+  filter(kit_id == "K019" |
+           kit_id == "K013" |
+           kit_id == "K010" |
+           kit_id == "K050" |
+           kit_id == "K061" |
+           kit_id == "K048" |
+           kit_id == "K026" |
+           kit_id == "K018" |
+           kit_id == "K035" |
+           kit_id == "K025")
+
+original_extract_sites <- target_sites_filtered %>%
+    filter(kit_id == "K019" |
+           kit_id == "K013" |
+           kit_id == "K010" |
+           kit_id == "K039" |
+           kit_id == "K056" |
+           kit_id == "K048" |
+           kit_id == "K040" |
+           kit_id == "K015" |
+           kit_id == "K035" |
+           kit_id == "K044")
+
+# plot original sites!!
+ggplot(data = gl) +
+  geom_sf() +
+  coord_sf(xlim = c(-92,-75), ylim = c(37,47)) +
+  geom_point(data = original_extract_sites, mapping = aes(x = water_longitude, y = water_latitude, color = sal_psu), size = 2) +
+  theme_bw() +
+  labs(x = "Longitude", y = "Latitude")
+
+ggplot(data = usa) +
+  geom_sf() +
+  coord_sf(xlim = c(-77.5,-74.5), ylim = c(37.2,40)) +
+  geom_point(data = original_extract_sites, mapping = aes(x = water_longitude, y = water_latitude, color = sal_psu), size = 2) +
+  theme_bw() +
+  labs(x = "Longitude", y = "Latitude")
+
+# plot final sites!!
+ggplot(data = gl) +
+  geom_sf() +
+  coord_sf(xlim = c(-92,-75), ylim = c(37,47)) +
+  geom_point(data = final_extract_sites, mapping = aes(x = water_longitude, y = water_latitude, color = sal_psu), size = 2) +
+  theme_bw() +
+  labs(x = "Longitude", y = "Latitude")
+
+ggplot(data = usa) +
+  geom_sf() +
+  coord_sf(xlim = c(-77.5,-74.5), ylim = c(37.2,40)) +
+  geom_point(data = final_extract_sites, mapping = aes(x = water_longitude, y = water_latitude, color = sal_psu), size = 2) +
+  theme_bw() +
+  labs(x = "Longitude", y = "Latitude")
 ```
 
