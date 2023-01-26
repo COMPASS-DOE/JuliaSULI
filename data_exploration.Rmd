@@ -107,6 +107,7 @@ library(rnaturalearthhires)
 # pull info from rnaturalearth package to get world information
 usa <- ne_states(country = "United States of America", returnclass = "sf")
 gl <- ne_states(country = c("United States of America", "Canada"), returnclass = "sf")
+# ne_states pulls geographic boundaries at the state level
 
 #lakes <- rnaturalearth::ne_download(scale = 10, type = 'lakes', category = 'physical', returnclass = "sf")
 # getting error message here to get more detail map attributes - address later!!
@@ -115,10 +116,13 @@ gl <- ne_states(country = c("United States of America", "Canada"), returnclass =
 # all water sampling locations plotted!
 ggplot(data = usa) +
   geom_sf() +
-  coord_sf(xlim = c(-95,-75), ylim = c(35,50)) +
+  coord_sf(xlim = c(-95,-75), ylim = c(35,50)) + # set coordinate boundaries
   geom_point(data = water, mapping = aes(x = water_longitude, y = water_latitude, label = kit_id)) +
   geom_label(data = water, aes(x = water_longitude, y = water_latitude, label = kit_id))
 # geom_label has to be fed the aesthetics to replace a point with the name of the point
+
+ggplot(data = gl) +
+  geom_sf()
 ```
 
 ```{r}
@@ -133,7 +137,8 @@ GL_water <- water %>%
 ggplot(data = usa) +
   geom_sf() +
   coord_sf(xlim = c(-77.5,-74.5), ylim = c(37.2,40)) +
-  geom_point(data = CB_water, mapping = aes(x = water_longitude, y = water_latitude, color = npoc_mgl)) +
+  geom_point(data = CB_water, mapping = aes(x = water_longitude, y = water_latitude, color = npoc_mgl)) + 
+  # add points from another data frame
   theme_bw() +
   labs(x = "Longitude", y = "Latitude", color = "NPOC (mg/L)")
 
