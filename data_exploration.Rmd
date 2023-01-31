@@ -16,6 +16,9 @@ library(ggplot2)
 library(dplyr)
 library(ggpubr)
 library(viridis)
+library(stringr)
+library(janitor)
+library(readxl)
 ```
 
 ```{r}
@@ -440,26 +443,154 @@ ggplot(water_soil_carbon_noNA, aes(x=water_body, y = tc_perc, fill = transect_lo
 ## Thinking through Set of Soil Extractions
 
 ```{r}
+# bring in metadata about soil samples
+soil_availability <- readxl::read_excel("~/EC1 Soil Jar Sieving Metadata.xlsx")
+
+# make spreadsheet column names tidy
+soil_availability <- clean_names(soil_availability)
+
+# remove excess columns
+soil_availability_reduce <- soil_availability[,-c(2:5,19:32)]
+
+# pull out the transect location from sample name and remove it from the sample name
+soil_availability_reduce <- soil_availability_reduce %>%
+  mutate(transect_location = gsub(".*_", "", sample),
+         kit_id = gsub("_.*", "", sample)) %>%
+  select(-sample) %>%
+  relocate(transect_location, .before = sample_weight_from_tare_g) %>%
+  relocate(kit_id, .before = transect_location) %>%
+  mutate(transect_location = str_to_title(transect_location))
+
+# add column for whether or not a kit has sediment
+soil_availability_reduce$sediment_available <- ifelse(soil_availability_reduce$transect_location == "Sediment",
+                                                      1,
+                                                      0)
+
+# summary data frame from the availability spreadsheet
+available_soils_sum <- soil_availability_reduce %>%
+  group_by(kit_id) %>%
+  summarize(TAI_gradient = n(),
+            sediment = sum(sediment_available))
+
+# figure out if UP -> W is available
+available_soils_sum <- available_soils_sum %>%
+  mutate(UP_T_W = TAI_gradient - sediment) %>%
+  select(-TAI_gradient)
+```
+
+```{r}
+# prep metadata data frames!!
 # group the soil samples by Kit ID and then count how many per kit
 site_summary <- water_soil_carbon_noNA %>%
   group_by(kit_id, water_npoc_mgl, water_latitude, water_longitude, region, water_systemtype, water_body) %>%
   summarize(soil_samples = n())
 
-# add the total number of soil samples -> should return 130 total
-sum(site_summary$soil_samples)
-
-# filter out sites that don't have all samples to get a list of the ones I want to pick from
-target_sites <- site_summary %>%
-  filter(soil_samples == 3)
-
-# and filter out the sites with high NPOC
-target_sites_filtered <- target_sites %>%
-  filter(water_npoc_mgl < 25)
-
 # bring salinity data in!
 water_quality <- read.csv("~/EC1_WaterQuality_L0B_20220509.csv")
-target_sites_filtered <- left_join(target_sites_filtered, water_quality, by = "kit_id")
+site_summary_WQ <- left_join(site_summary, water_quality, by = "kit_id")
 
+# merge soil availability with the metadata
+all_available_kits <- left_join(available_soils_sum, site_summary_WQ)
+```
+
+```{r}
+# FILTERING TO TARGET SITES
+filter_available_kits <- all_available_kits %>%
+  filter(!is.na(water_npoc_mgl)) %>% # remove sites without water information
+  filter(UP_T_W == 3) %>% # remove sites that do not have the entire transect present
+  select(-transect_location) # remove this column for better merging
+
+# merge these filtered kits back with soil mass info
+filter_kits_masses <- left_join(filter_available_kits, soil_availability_reduce)
+
+# merge soil metadata for TC % back with the giant data frame
+filter_kits_masses <- left_join(filter_kits_masses, water_soil_carbon)
+
+# add column to calculate current amount of soil for each kit/transect location
+filter_kits_masses$available_mass_after_xrd <- filter_kits_masses$post_sieving_weight_from_tare_g - 1
+
+# clean up the data frame
+filter_kits_masses <- filter_kits_masses[,-c(16:19,21:33)]
+
+# add a column for the kits that have already been done!!
+filter_kits_masses <- filter_kits_masses %>%
+  mutate(analyzed = ifelse(kit_id == "K019" |
+           kit_id == "K013" |
+           kit_id == "K010" |
+           kit_id == "K050" |
+           kit_id == "K061" |
+           kit_id == "K048" |
+           kit_id == "K026" |
+           kit_id == "K018" |
+           kit_id == "K035" |
+           kit_id == "K025",
+           "YES",
+           "NO"))
+
+# separate out by water body
+GL_filtered_kits <- filter_kits_masses %>%
+  filter(water_body == "Great Lakes")
+CB_filtered_kits <- filter_kits_masses %>%
+  filter(water_body == "Chesapeake Bay")
+DB_filtered_kits <- filter_kits_masses %>%
+  filter(water_body == "Delaware Bay")
+
+# info for just kits already analyzed to use as a reference
+kits_analyzed <- filter_kits_masses %>%
+  filter(kit_id == "K019" |
+           kit_id == "K013" |
+           kit_id == "K010" |
+           kit_id == "K050" |
+           kit_id == "K061" |
+           kit_id == "K048" |
+           kit_id == "K026" |
+           kit_id == "K018" |
+           kit_id == "K035" |
+           kit_id == "K025") %>%
+  filter(transect_location != "Sediment") %>%
+  relocate(transect_location, .after = kit_id) %>%
+  relocate(tc_perc, .after = transect_location)
+```
+
+```{r}
+# DELAWARE BAY SITES
+# just a note - all kits here have sediments as well
+# remove sediment information since values are NA anyway
+DB_filtered_kits <- DB_filtered_kits %>%
+  filter(transect_location != "Sediment")
+
+# add new column for potential for analysis
+DB_filtered_kits <- DB_filtered_kits %>%
+  mutate(good_soil_amount = ifelse(available_mass_after_xrd > 21,
+                                   1,
+                                   0))
+
+# summarize DB kits
+DB_kits_summary <- DB_filtered_kits %>%
+  group_by(kit_id, analyzed, water_longitude, water_latitude) %>%
+  summarize(status = sum(good_soil_amount))
+
+DB_kits_summary$status <- as.factor(DB_kits_summary$status)
+
+# map the DB information
+ggplot(data = usa) +
+  geom_sf() +
+  coord_sf(xlim = c(-75.75,-74.75), ylim = c(38.9,40)) +
+  geom_point(data = DB_kits_summary, mapping = aes(x = water_longitude, y = water_latitude, color = status, shape = analyzed), size = 2.5) +
+  theme_bw() +
+  labs(x = "Longitude", y = "Latitude", color = "Transect Locations with Enough Soil", shape = "Analyzed Already?")
+  
+```
+
+```{r}
+# CHESAPEAKE BAY SITES
+# Kit 51 is the only one without sediment collected
+# remove sediment rows
+CB_filtered_kits <- CB_filtered_kits %>%
+  filter(transect_location != "Sediment")
+```
+
+``` {r}
 # map target sites to get a feel for spatial layout
 # chesapeake region
 ggplot(data = usa) +
