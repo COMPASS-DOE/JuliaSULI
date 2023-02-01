@@ -500,94 +500,99 @@ filter_available_kits <- all_available_kits %>%
   filter(UP_T_W == 3) %>% # remove sites that do not have the entire transect present
   select(-transect_location) # remove this column for better merging
 
-# merge these filtered kits back with soil mass info
-filter_kits_masses <- left_join(filter_available_kits, soil_availability_reduce)
+# bring in excel sheet with soil amounts classified
+soil_availability_class <- readxl::read_excel("~/EC1_WSOM_Feasibility.xlsx")
 
-# merge soil metadata for TC % back with the giant data frame
-filter_kits_masses <- left_join(filter_kits_masses, water_soil_carbon)
+# add a column to indicate whether a kit can absolutely happen or not
+soil_availability_class$possible_at_all <- ifelse(soil_availability_class$status == "nope",
+                                            1,
+                                            0)
 
-# add column to calculate current amount of soil for each kit/transect location
-filter_kits_masses$available_mass_after_xrd <- filter_kits_masses$post_sieving_weight_from_tare_g - 1
+# add column for indication of hard to do
+soil_availability_class$hard_to_do <- ifelse(soil_availability_class$status == "not worth it",
+                                       1,
+                                       0)
 
-# clean up the data frame
-filter_kits_masses <- filter_kits_masses[,-c(16:19,21:33)]
+# add column to indicate ones that we would need a good argument for
+soil_availability_class$strong_case <- ifelse(soil_availability_class$status == "unlikely",
+                                        1,
+                                        0)
 
-# add a column for the kits that have already been done!!
-filter_kits_masses <- filter_kits_masses %>%
-  mutate(analyzed = ifelse(kit_id == "K019" |
-           kit_id == "K013" |
-           kit_id == "K010" |
-           kit_id == "K050" |
-           kit_id == "K061" |
-           kit_id == "K048" |
-           kit_id == "K026" |
-           kit_id == "K018" |
-           kit_id == "K035" |
-           kit_id == "K025",
-           "YES",
-           "NO"))
+# add column to assign points to the rest of the categories
+soil_availability_class$points <- case_when(
+  soil_availability_class$status == "okay" ~ 1,
+  soil_availability_class$status == "more likely" ~ 2,
+  soil_availability_class$status == "best case scenario" ~ 3,
+  soil_availability_class$status == "already analyzed" ~ 5
+)
+soil_availability_class$points <- ifelse(is.na(soil_availability_class$points),
+                                   0,
+                                   soil_availability_class$points)
 
-# separate out by water body
-GL_filtered_kits <- filter_kits_masses %>%
-  filter(water_body == "Great Lakes")
-CB_filtered_kits <- filter_kits_masses %>%
-  filter(water_body == "Chesapeake Bay")
-DB_filtered_kits <- filter_kits_masses %>%
-  filter(water_body == "Delaware Bay")
+# summary data sheet
+soil_class_sum <- soil_availability_class %>%
+  group_by(kit_id) %>%
+  summarize(total_points = sum(points),
+            total_strong_case = sum(strong_case),
+            total_hard = sum(hard_to_do),
+            total_nope = sum(possible_at_all))
 
-# info for just kits already analyzed to use as a reference
-kits_analyzed <- filter_kits_masses %>%
-  filter(kit_id == "K019" |
-           kit_id == "K013" |
-           kit_id == "K010" |
-           kit_id == "K050" |
-           kit_id == "K061" |
-           kit_id == "K048" |
-           kit_id == "K026" |
-           kit_id == "K018" |
-           kit_id == "K035" |
-           kit_id == "K025") %>%
-  filter(transect_location != "Sediment") %>%
-  relocate(transect_location, .after = kit_id) %>%
-  relocate(tc_perc, .after = transect_location)
+# create the final score for each of the kits
+soil_class_sum$final_score <- soil_class_sum$total_points
+
+for (a in 1:nrow(soil_class_sum)) {
+  
+  if (soil_class_sum$total_nope[a] != 0) {
+    soil_class_sum$final_score[a] <- 0
+  }
+  else {
+    if (soil_class_sum$total_hard[a] != 0) {
+      soil_class_sum$final_score[a] <- 1
+    }
+    else {
+      if (soil_class_sum$total_strong_case[a] != 0) {
+        soil_class_sum$final_score[a] <- 2
+      }
+    }
+  }
+}
+
+# merge these scores with the filtered kits metadata
+target_sites <- left_join(soil_class_sum, filter_available_kits, by = "kit_id")
+
+# remove unnecessary columns
+target_sites <- target_sites[,-c(8,15,16,21:24)]
+
+# make final score a factor variable for easier mapping
+target_sites$final_score <- as.factor(target_sites$final_score)
 ```
 
 ```{r}
-# DELAWARE BAY SITES
-# just a note - all kits here have sediments as well
-# remove sediment information since values are NA anyway
-DB_filtered_kits <- DB_filtered_kits %>%
-  filter(transect_location != "Sediment")
+# maps of kits left that fit the criteria
 
-# add new column for potential for analysis
-DB_filtered_kits <- DB_filtered_kits %>%
-  mutate(good_soil_amount = ifelse(available_mass_after_xrd > 21,
-                                   1,
-                                   0))
-
-# summarize DB kits
-DB_kits_summary <- DB_filtered_kits %>%
-  group_by(kit_id, analyzed, water_longitude, water_latitude) %>%
-  summarize(status = sum(good_soil_amount))
-
-DB_kits_summary$status <- as.factor(DB_kits_summary$status)
-
-# map the DB information
+# map the Delaware Bay information
 ggplot(data = usa) +
   geom_sf() +
   coord_sf(xlim = c(-75.75,-74.75), ylim = c(38.9,40)) +
-  geom_point(data = DB_kits_summary, mapping = aes(x = water_longitude, y = water_latitude, color = status, shape = analyzed), size = 2.5) +
+  geom_point(data = filter(target_sites, water_body == "Delaware Bay"), mapping = aes(x = water_longitude, y = water_latitude, color = final_score), size = 2.5) +
   theme_bw() +
-  labs(x = "Longitude", y = "Latitude", color = "Transect Locations with Enough Soil", shape = "Analyzed Already?")
-  
-```
+  labs(x = "Longitude", y = "Latitude", color = "Feasibility Score")
 
-```{r}
-# CHESAPEAKE BAY SITES
-# Kit 51 is the only one without sediment collected
-# remove sediment rows
-CB_filtered_kits <- CB_filtered_kits %>%
-  filter(transect_location != "Sediment")
+# map the Chesapeake Bay
+ggplot(data = usa) +
+  geom_sf() +
+  coord_sf(xlim = c(-77.25,-75.5), ylim = c(37.2,39)) +
+  geom_point(data = filter(target_sites, water_body == "Chesapeake Bay"), mapping = aes(x = water_longitude, y = water_latitude, color = final_score), size = 2.5) +
+  theme_bw() +
+  labs(x = "Longitude", y = "Latitude", color = "Feasibility Score")
+
+# map the Great Lakes
+ggplot(data = gl) +
+  geom_sf() +
+  coord_sf(xlim = c(-92,-82), ylim = c(41.5,47)) +
+  geom_point(data = filter(target_sites, water_body == "Great Lakes"), mapping = aes(x = water_longitude, y = water_latitude, color = final_score), size = 2.5) +
+  theme_bw() +
+  labs(x = "Longitude", y = "Latitude", color = "Feasibility Score")
 ```
 
 ``` {r}
@@ -596,7 +601,7 @@ CB_filtered_kits <- CB_filtered_kits %>%
 ggplot(data = usa) +
   geom_sf() +
   coord_sf(xlim = c(-77.5,-74.5), ylim = c(37.2,40)) +
-  geom_point(data = target_sites_filtered, mapping = aes(x = water_longitude, y = water_latitude, color = water_systemtype)) +
+  geom_point(data = target_sites, mapping = aes(x = water_longitude, y = water_latitude, color = water_systemtype)) +
   theme_bw() +
   labs(x = "Longitude", y = "Latitude")
 
@@ -604,7 +609,7 @@ ggplot(data = usa) +
 ggplot(data = usa) +
   geom_sf() +
   coord_sf(xlim = c(-77.5,-74.5), ylim = c(37.2,40)) +
-  geom_point(data = target_sites_filtered, mapping = aes(x = water_longitude, y = water_latitude, color = sal_psu)) +
+  geom_point(data = target_sites, mapping = aes(x = water_longitude, y = water_latitude, color = sal_psu)) +
   theme_bw() +
   labs(x = "Longitude", y = "Latitude")
 
@@ -612,57 +617,14 @@ ggplot(data = usa) +
 ggplot(data = gl) +
   geom_sf() +
   coord_sf(xlim = c(-92,-82), ylim = c(40,48)) +
-  geom_point(data = target_sites_filtered, mapping = aes(x = water_longitude, y = water_latitude, color = water_systemtype)) +
+  geom_point(data = target_sites, mapping = aes(x = water_longitude, y = water_latitude, color = water_systemtype)) +
   theme_bw() +
   labs(x = "Longitude", y = "Latitude")
-```
-
-```{r}
-# pull out selected sites for a general map
-
-extract_sites <- water_soil_carbon_noNA %>%
-  filter(kit_id == "K019" |
-           kit_id == "K013" |
-           kit_id == "K010" |
-           kit_id == "K050" |
-           kit_id == "K061" |
-           kit_id == "K048" |
-           kit_id == "K026" |
-           kit_id == "K018" |
-           kit_id == "K035" |
-           kit_id == "K025")
-
-# make a map of sites
-# use gl data created earlier in script to get border for Great Lakes better
-ggplot(data = gl) +
-  geom_sf() +
-  coord_sf(xlim = c(-92,-75), ylim = c(37,47)) +
-  geom_point(data = extract_sites, mapping = aes(x = water_longitude, y = water_latitude, label = kit_id), color = "dark blue") +
-  theme_bw() +
-  labs(x = "Longitude", y = "Latitude")
-
-# zoom in for Mid-Atlantic region
-ggplot(data = usa) +
-  geom_sf() +
-  coord_sf(xlim = c(-77.5,-74.5), ylim = c(37.2,40)) +
-  geom_point(data = extract_sites, mapping = aes(x = water_longitude, y = water_latitude)) +
-  theme_bw() +
-  labs(x = "Longitude", y = "Latitude")
-
-# make easy reference data frames for TC
-sites_upland <- extract_sites %>%
-  filter(transect_location == "Upland")
-
-sites_transition <- extract_sites %>%
-  filter(transect_location == "Transition")
-
-sites_wetland <- extract_sites %>%
-  filter(transect_location == "Wetland")
 ```
 
 ```{r}
 # old vs new selected sites
-final_extract_sites <- target_sites_filtered %>%
+final_extract_sites <- target_sites %>%
   filter(kit_id == "K019" |
            kit_id == "K013" |
            kit_id == "K010" |
@@ -674,7 +636,7 @@ final_extract_sites <- target_sites_filtered %>%
            kit_id == "K035" |
            kit_id == "K025")
 
-original_extract_sites <- target_sites_filtered %>%
+original_extract_sites <- target_sites %>%
     filter(kit_id == "K019" |
            kit_id == "K013" |
            kit_id == "K010" |
