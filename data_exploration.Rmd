@@ -679,3 +679,99 @@ ggplot(data = usa) +
   labs(x = "Longitude", y = "Latitude")
 ```
 
+```{r}
+# bring in soils metadata to look at gradients in characteristics
+all_soil_info <- readRDS("soils_data_merged_withmeta (4).rds")
+
+# cut soil information down to the sites used
+soil_info_sites <- all_soil_info %>%
+  filter(kit_id %in% final_extract_sites$kit_id)
+
+# get lat/long info for the WSOM extracts
+sites_lat_long <-sample_collection_metadata %>%
+  filter(kit_id %in% final_extract_sites$kit_id) %>%
+  select(kit_id, contains("latitude")|contains("longitude")) %>%
+  select(-contains("sediment")) %>%
+  pivot_longer(-kit_id, 
+               names_to = c("transect_location", ".value"),
+               names_pattern = "(.+)_(.+)") %>%
+  mutate(transect_location = str_to_title(transect_location))
+
+# create data frame with lat/long and soil characteristics info for the extract sites
+extract_sites_soil_info <- soil_info_sites %>%
+  select(-contains("flag"), -date_run, -contains("collect")) %>%
+  filter(transect_location != "Sediment") %>%
+  full_join(sites_lat_long, by = c("kit_id", "transect_location"))
+  
+```
+
+```{r}
+# look at all sites in the Chesapeake that could be extracted
+target_sites_soils_info <- all_soil_info %>%
+  filter(state == "VA" | state == "MD") %>%
+  filter(kit_id %in% target_sites$kit_id) %>%
+  filter(transect_location != "Sediment")
+
+target_sites_lat_long <- sample_collection_metadata %>%
+  filter(kit_id %in% target_sites_soils_info$kit_id) %>%
+  select(kit_id, contains("latitude")|contains("longitude")) %>%
+  select(-contains("sediment")) %>%
+  pivot_longer(-kit_id, 
+               names_to = c("transect_location", ".value"),
+               names_pattern = "(.+)_(.+)") %>%
+  mutate(transect_location = str_to_title(transect_location))
+
+target_sites_soils_info <- target_sites_soils_info%>%
+  select(-contains("flag"), -date_run, -contains("collect")) %>%
+  full_join(target_sites_lat_long, by = c("kit_id", "transect_location"))
+
+# bring in water data too
+target_sites_water <- target_sites_soils_info %>%
+  filter(transect_location == "Water") %>%
+  select(kit_id, transect_location, latitude, longitude) %>%
+  left_join(select(target_sites, kit_id, water_npoc_mgl, sal_psu, ph, orp_mv, alk_mgl_caco3))
+
+# bind soils and water info together
+target_sites_soils_info <- target_sites_soils_info %>%
+  filter(transect_location != "Water")
+
+target_sites_soils_water <- bind_rows(target_sites_soils_info, target_sites_water) %>%
+  group_by(kit_id) %>%
+  mutate(already_extracted = ifelse(kit_id %in% final_extract_sites$kit_id,
+                                    "YES",
+                                    "NO"))
+
+# use newly created dataset to look at range in specific conductance and pH
+target_sites_soils_water %>%
+  filter(transect_location != "Water") %>%
+  ggplot(aes(x = factor(transect_location, levels = c("Upland", "Transition", "Wetland")), y = specific_conductance_us_cm, color = kit_id, shape = already_extracted)) +
+  geom_point() +
+  labs(x = "Transect Location")
+
+target_sites_soils_water %>%
+  ggplot(aes(x = factor(transect_location, levels = c("Upland", "Transition", "Wetland", "Water")), y = ph, color = kit_id, shape = already_extracted)) +
+  geom_point() +
+  labs(x = "Transect Location")
+
+```
+
+```{r}
+# zoom in on sites already extracted
+# look at values of specific conductance by kit
+target_sites_soils_water %>%
+  filter(already_extracted == "YES") %>%
+  filter(transect_location != "Water") %>%
+  ggplot(aes(x = factor(transect_location, levels = c("Upland", "Transition", "Wetland")), y = specific_conductance_us_cm, color = kit_id)) +
+  geom_point() +
+  labs(x = "Transect Location")
+
+# look at values of pH by kit
+target_sites_soils_water %>%
+  filter(already_extracted == "YES") %>%
+  ggplot(aes(x = factor(transect_location, levels = c("Upland", "Transition", "Wetland", "Water")), y = ph, color = kit_id)) +
+  geom_point() +
+  labs(x = "Transect Location")
+
+```
+
+
