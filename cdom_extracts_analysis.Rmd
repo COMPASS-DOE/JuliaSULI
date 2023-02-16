@@ -12,10 +12,12 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r, message=FALSE, echo =FALSE, warning = FALSE}
 # required packages
-packages_list <- c("tidyverse", "broom", "ggpubr", "ggfortify", "GGally",
-                   "rstatix")
-
-lapply(packages_list, library, character.only = TRUE)
+require(pacman)
+pacman::p_load(tidyverse,
+               broom,
+               ggpubr,
+               ggfortify,
+               GGally)
 
 # set data files location
 cdom_data_location = paste0(getwd(), "/Original Data Files")
@@ -70,17 +72,19 @@ ggsave("abs_spectra.png", path = output_directory,
 
 ## Data Preparation
 
-```{r}
-# data frame edits
+```{r CDOM data frame edits}
+# remove the CDOM standards
 extracts_cdom_indices <- extracts_cdom_indices %>%
   filter(!is.na(SUVA254))
 
+# edit column names of spreadsheets
 names(extracts_cdom_peaks) <- gsub(pattern = "_per_unitDOC", replacement = "", 
                                    x =names(extracts_cdom_peaks))
 
 names(water_cdom_peaks) <- gsub(pattern = "_per_unitDOC", replacement = "",
                                 x = names(water_cdom_peaks))
 
+# make sure all CDOM output spreadsheets match with kit_id column
 colnames(extracts_cdom_indices)[1] <- "kit_id"
 colnames(extracts_cdom_peaks)[1] <- "kit_id"
 colnames(water_cdom_indices)[1] <- "kit_id"
@@ -150,13 +154,9 @@ extracts_cdom <- extracts_cdom_original %>%
 ```
 
 ```{r}
-## merge CDOM datasets together 
+## prepare big data frame of all CDOM metrics plus soil/water characteristics
 water_cdom <- water_cdom[,-2]
-extract_sites_CDOM <- rbind(extracts_cdom, filter(water_cdom, water_cdom$kit_id %in% extracts_cdom$kit_id))
 
-```
-
-```{r}
 # bring in metadata to get location information for the kits
 water_soil <- read_rds("./R Data Files/EC1_water_soil_data.rds")
 
@@ -166,15 +166,33 @@ water_soil <- water_soil %>%
 water_soil$region <- as.factor(water_soil$region)
 
 # merge info with cdom data
-water_soil_location <- water_soil %>%
-  select(kit_id, state, region, water_body, water_systemtype)
+water_soil <- water_soil %>%
+  filter(transect_location != "Sediment")
 
-extract_sites_CDOM <- left_join(extract_sites_CDOM, water_soil_location, by = "kit_id")
-extract_sites_CDOM <- unique(extract_sites_CDOM)
+# merge water characteristics with CDOM information
+water_info <- water_soil %>%
+  select(campaign, kit_id, state, region, contains("water")) %>%
+  unique() %>%
+  filter(!is.na(state))
 
-# relevel transect_location
-extract_sites_CDOM$kit_id <- as.factor(extract_sites_CDOM$kit_id)
-extract_sites_CDOM$transect_location <- factor(extract_sites_CDOM$transect_location,
+water_cdom_info <- water_cdom %>%
+  filter(kit_id %in% extracts_cdom$kit_id) %>%
+  left_join(water_info, by = "kit_id") %>%
+  rename(ph = water_ph) %>%
+  relocate(campaign:water_systemtype, .before = SUVA254)
+
+# merge soil characteristics with extract CDOM info
+extracts_cdom_info <- extracts_cdom %>%
+  filter(!is.na(SUVA254)) %>%
+  left_join(select(water_soil, campaign:water_systemtype, transect_location:percent_sand)) %>%
+  relocate(campaign:water_systemtype, .before = SUVA254)
+
+# bind extracts and water together
+cdom_water_extracts <- bind_rows(extracts_cdom_info, water_cdom_info)
+
+# work with factor variables
+cdom_water_extracts$kit_id <- as.factor(cdom_water_extracts$kit_id)
+cdom_water_extracts$transect_location <- factor(cdom_water_extracts$transect_location,
                                                levels = c("Upland", "Transition", "Wetland", "Water"))
 ```
 
@@ -182,10 +200,10 @@ extract_sites_CDOM$transect_location <- factor(extract_sites_CDOM$transect_locat
 
 ```{r}
 # set up data frame
-pca_extracts_cdom <- extract_sites_CDOM[,c(3,4,6,8:13)]
+pca_extracts_cdom <- cdom_water_extracts[,c(8,9,11,13:18)]
 
 # pull kit IDs to change the row names for labels on the PCA plot
-extracts_kit_id <- extract_sites_CDOM[,1]
+extracts_kit_id <- cdom_water_extracts[,1]
 
 # change row names of data frame used for PCA
 # row.names(pca_extracts_cdom) <- pca_extracts_cdom
@@ -213,7 +231,7 @@ pc$sdev^2 / sum(pc$sdev^2)
 biplot(pc, scale = 0)
 
 # add data about transect location
-pca_plot <- autoplot(pc, data = extract_sites_CDOM, colour = 'transect_location', frame = T, size = 3, loadings = TRUE,
+pca_plot <- autoplot(pc, data = cdom_water_extracts, colour = 'transect_location', frame = T, size = 3, loadings = TRUE,
          loadings.colour = 'black', loadings.label = TRUE,
          loadings.label.colour = 'black')
 pca_plot
@@ -222,12 +240,12 @@ pca_plot + scale_fill_manual(values = palette) +
   labs(color = "Gradient Location", fill = "Gradient Location")
 
 # try kit id
-autoplot(pc, data = extract_sites_CDOM, colour = 'kit_id', size = 3, loadings = TRUE,
+autoplot(pc, data = cdom_water_extracts, colour = 'kit_id', size = 3, loadings = TRUE,
          loadings.colour = 'black', loadings.label = TRUE)
 # no cluster pattern here
 
 # try region and transect location
-autoplot(pc, data = extract_sites_CDOM, size = 3, frame = T,
+autoplot(pc, data = cdom_water_extracts, size = 3, frame = T,
          shape = 'region', loadings.colour = "black", loadings.label = TRUE)
 ```
 
@@ -249,12 +267,12 @@ pc2$sdev^2 / sum(pc2$sdev^2)
 
 ```{r}
 # plot the new PCA
-new_pca_plot <- autoplot(pc2, data = extract_sites_CDOM, colour = 'transect_location',
+new_pca_plot <- autoplot(pc2, data = cdom_water_extracts, colour = 'transect_location',
                          shape = 'region',
                          frame = T, size = 3, loadings = TRUE,
          loadings.colour = 'black', loadings.size = 3, loadings.label = TRUE,
          loadings.label.colour = 'black',
-         loadings.label.hjust = 1.1, loadings.label.vjust = 1.5,
+         loadings.label.hjust = 0.8, loadings.label.vjust = 1.6,
          loadings.label.size = 5.5)
 
 new_pca_plot + scale_fill_manual(values = palette) + 
@@ -270,8 +288,8 @@ ggsave("cdom_pca.png", path = output_directory,
 # work more with ggplot and clustering analysis
 ## customize plots with ggplot
 # pull out needed info
-pc_df <- data.frame(pc$x, transect_location = extract_sites_CDOM$transect_location,
-                    region = extract_sites_CDOM$region)
+pc_df <- data.frame(pc$x, transect_location = cdom_water_extracts$transect_location,
+                    region = cdom_water_extracts$region)
 
 # ggplot
 ggplot(pc_df, aes(x = PC1, y = PC2, color = transect_location, shape = region)) +
@@ -284,8 +302,8 @@ scores <- pc2$x[,1:3]                        # scores for first three PC's
 
 # k-means clustering
 km     <- kmeans(scores, centers=4, nstart=5)
-ggdata <- data.frame(scores, Cluster=km$cluster, location=extract_sites_CDOM$transect_location,
-                     region = extract_sites_CDOM$region)
+ggdata <- data.frame(scores, Cluster=km$cluster, location=cdom_water_extracts$transect_location,
+                     region = cdom_water_extracts$region)
 
 ggplot(ggdata) +
   geom_point(aes(x=PC1, y=PC2, color=factor(location),shape=factor(region)), size=2.5) +
@@ -299,7 +317,7 @@ ggplot(ggdata) +
 
 ```{r, message = FALSE, warning = FALSE}
 cdom_corr <- pca_extracts_cdom
-cdom_groups <- as.data.frame(extract_sites_CDOM[,2])
+cdom_groups <- as.data.frame(cdom_water_extracts[,2])
 
 # correlation scatter plot
 ggpairs(cdom_corr, ggplot2::aes(color = cdom_groups$transect_location),
@@ -314,7 +332,7 @@ ggpairs(cdom_corr, ggplot2::aes(color = cdom_groups$transect_location),
 
 ```{r}
 # two absorbance metrics
-ggplot(extract_sites_CDOM, aes(x = SUVA254, y = S350_400, color = transect_location)) +
+ggplot(cdom_water_extracts, aes(x = SUVA254, y = S350_400, color = transect_location)) +
   geom_point(size = 2.5) +
   scale_color_manual(values = palette) +
   labs(x = "SUVA at 254 nm", y = "Spectral Slope 350-400 nm", color = "Gradient Location")
@@ -325,7 +343,7 @@ ggsave("SUVA254_S350_400.png", path = output_directory,
 
 ```{r}
 # two fluorescence metrics
-ggplot(extract_sites_CDOM, aes(x = FI, y = FRESH, color = transect_location)) +
+ggplot(cdom_water_extracts, aes(x = FI, y = FRESH, color = transect_location)) +
   geom_point(size = 2.5) +
   scale_color_manual(values = palette) +
   labs(x = "Fluorescense Index", y = "Freshness Index", color = "Gradient Location")
@@ -337,14 +355,14 @@ ggsave("FI_FRESH.png", path = output_directory,
 ### Summary Stats for FRESH, FI, HIX, SUVA254, and S350_400
 
 ```{r}
-CDOM_sum_mean <- extract_sites_CDOM %>%
+CDOM_sum_mean <- cdom_water_extracts %>%
   select(transect_location, SUVA254, S350_400, FI, FRESH, HIX) %>%
   group_by(transect_location) %>%
   summarize(across(everything(), mean))
 
 colnames(CDOM_sum_mean)[-1] <- paste0(colnames(CDOM_sum_mean)[-1], "_mean")
 
-CDOM_sum_sd <- extract_sites_CDOM %>%
+CDOM_sum_sd <- cdom_water_extracts %>%
   select(transect_location, SUVA254, S350_400, FI, FRESH, HIX) %>%
   group_by(transect_location) %>%
   summarize(across(everything(), sd))
@@ -358,7 +376,7 @@ colnames(CDOM_sum_se)[-1] <- paste0(colnames(CDOM_sum_se)[-1], "_se")
 
 ```{r}
 # boxplots for indices across the gradient
-SUVA <- ggplot(extract_sites_CDOM, aes(x = transect_location, y = SUVA254, color = transect_location)) +
+SUVA <- ggplot(cdom_water_extracts, aes(x = transect_location, y = SUVA254, color = transect_location)) +
   geom_boxplot(lwd = 1, fatten = 1,
                outlier.shape = NA, show.legend = FALSE) +
   geom_point(position = position_jitterdodge(), size = 2, show.legend = FALSE) +
@@ -367,7 +385,7 @@ SUVA <- ggplot(extract_sites_CDOM, aes(x = transect_location, y = SUVA254, color
   theme(axis.title.x = element_blank(),     
         axis.text.x = element_blank())    # remove the axis labels and ticks for common axis in ggarrange()
 
-SS <- ggplot(extract_sites_CDOM, aes(x = transect_location, y = S350_400, color = transect_location)) +
+SS <- ggplot(cdom_water_extracts, aes(x = transect_location, y = S350_400, color = transect_location)) +
   geom_boxplot(lwd = 1, fatten = 1,
                outlier.shape = NA, show.legend = FALSE) +
   geom_point(position = position_jitterdodge(), size = 2, show.legend = FALSE) +
@@ -376,21 +394,21 @@ SS <- ggplot(extract_sites_CDOM, aes(x = transect_location, y = S350_400, color 
   theme(axis.title.x = element_blank(),     
         axis.text.x = element_blank())
 
-FI <- ggplot(extract_sites_CDOM, aes(x = transect_location, y = FI, color = transect_location)) +
+FI <- ggplot(cdom_water_extracts, aes(x = transect_location, y = FI, color = transect_location)) +
   geom_boxplot(lwd = 1, fatten = 1,
                outlier.shape = NA, show.legend = FALSE) +
   geom_point(position = position_jitterdodge(), size = 2, show.legend = FALSE) +
   scale_color_manual(values = palette) +
   labs(x = "Gradient Location", y = "Fluorescence Index", color = "")
 
-FRESH <- ggplot(extract_sites_CDOM, aes(x = transect_location, y = FRESH, color = transect_location)) +
+FRESH <- ggplot(cdom_water_extracts, aes(x = transect_location, y = FRESH, color = transect_location)) +
   geom_boxplot(lwd = 1, fatten = 1,
                outlier.shape = NA, show.legend = FALSE) +
   geom_point(position = position_jitterdodge(), size = 2, show.legend = FALSE) +
   scale_color_manual(values = palette) +
   labs(x = "Gradient Location", y = "Freshness Index", color = "")
 
-HIX <- ggplot(extract_sites_CDOM, aes(x = transect_location, y = HIX, color = transect_location)) +
+HIX <- ggplot(cdom_water_extracts, aes(x = transect_location, y = HIX, color = transect_location)) +
   geom_boxplot(lwd = 1, fatten = 1,
                outlier.shape = NA, show.legend = FALSE) +
   geom_point(position = position_jitterdodge(), size = 2, show.legend = FALSE) +
@@ -407,15 +425,15 @@ ggsave("cdom_indices_boxplots.png", path = output_directory,
 
 ```{r}
 #checking normality for ANOVA
-ggplot(extract_sites_CDOM, aes(x = SUVA254, color = transect_location)) +
+ggplot(cdom_water_extracts, aes(x = SUVA254, color = transect_location)) +
   geom_density()
-ggplot(extract_sites_CDOM, aes(x = S350_400, color = transect_location)) +
+ggplot(cdom_water_extracts, aes(x = S350_400, color = transect_location)) +
   geom_density()
-ggplot(extract_sites_CDOM, aes(x = FRESH, color = transect_location)) +
+ggplot(cdom_water_extracts, aes(x = FRESH, color = transect_location)) +
   geom_density()
-ggplot(extract_sites_CDOM, aes(x = FI, color = transect_location)) +
+ggplot(cdom_water_extracts, aes(x = FI, color = transect_location)) +
   geom_density()
-ggplot(extract_sites_CDOM, aes(x = HIX, color = transect_location)) +
+ggplot(cdom_water_extracts, aes(x = HIX, color = transect_location)) +
   geom_density()
 
 # no way to transform well either - tried ln() and log10() transformation with no success
@@ -425,23 +443,57 @@ ggplot(extract_sites_CDOM, aes(x = HIX, color = transect_location)) +
 ```{r}
 # kruskal-wallis tests for difference between transects for the indices
 # SUVA254
-kruskal.test(SUVA254 ~ transect_location, extract_sites_CDOM)
-dunn_test(extract_sites_CDOM, SUVA254 ~ transect_location, p.adjust.method = "holm")
+kruskal.test(SUVA254 ~ transect_location, cdom_water_extracts)
+dunn_test(cdom_water_extracts, SUVA254 ~ transect_location, p.adjust.method = "holm")
 
 # S350-400
-kruskal.test(S350_400 ~ transect_location, extract_sites_CDOM)
-dunn_test(extract_sites_CDOM, S350_400 ~ transect_location, p.adjust.method = "holm")
+kruskal.test(S350_400 ~ transect_location, cdom_water_extracts)
+dunn_test(cdom_water_extracts, S350_400 ~ transect_location, p.adjust.method = "holm")
 
 # FRESH
-kruskal.test(FRESH ~ transect_location, extract_sites_CDOM)
-dunn_test(extract_sites_CDOM, FRESH ~ transect_location, p.adjust.method = "holm")
+kruskal.test(FRESH ~ transect_location, cdom_water_extracts)
+dunn_test(cdom_water_extracts, FRESH ~ transect_location, p.adjust.method = "holm")
 
 # FI
-kruskal.test(FI ~ transect_location, extract_sites_CDOM)
-dunn_test(extract_sites_CDOM, FI ~ transect_location, p.adjust.method = "holm")
+kruskal.test(FI ~ transect_location, cdom_water_extracts)
+dunn_test(cdom_water_extracts, FI ~ transect_location, p.adjust.method = "holm")
 
 # HIX
-kruskal.test(HIX ~ transect_location, extract_sites_CDOM)
-dunn_test(extract_sites_CDOM, HIX ~ transect_location, p.adjust.method = "holm")
+kruskal.test(HIX ~ transect_location, cdom_water_extracts)
+dunn_test(cdom_water_extracts, HIX ~ transect_location, p.adjust.method = "holm")
 ```
+
+## Exploring Optical Metrics vs Other Soil Characteristics for CB Sites
+
+```{r}
+# create dataset that is just Chesapeake
+cb_cdom_water_extracts <- cdom_water_extracts %>%
+  filter(water_body == "Chesapeake Bay")
+
+# general boxplot of SUVA254 distribution
+ggplot(cb_cdom_water_extracts, aes(x = transect_location, y = SUVA254, color = transect_location)) +
+  geom_boxplot() +
+  geom_jitter() +
+  labs(x = "Transect Location", y = "SUVA254", color = "")
+
+# pH vs SUVA254
+ggplot(cb_cdom_water_extracts, aes(x = ph, y = SUVA254, color = transect_location)) +
+  geom_point()
+
+# all extract sites
+ggplot(cdom_water_extracts, aes(x = ph, y = SUVA254, color = transect_location)) +
+  geom_point()
+
+# specific conductance vs SUVA254
+ggplot(filter(cb_cdom_water_extracts, transect_location != "Water"), aes(x = specific_conductance_us_cm, y = SUVA254, color = transect_location)) +
+  geom_point()
+
+# salinity vs SUVA254 (for water samples)
+ggplot(filter(cb_cdom_water_extracts, transect_location == "Water"), aes(x = water_sal_psu, y = SUVA254, color = transect_location)) +
+  geom_point()
+
+```
+
+
+
 
