@@ -1,0 +1,27 @@
+pixel_value,land_cover_class
+0,background
+1,unclassified
+2,"developed, high intensity"
+3,"developed, medium intensity"
+4,"developed, low intensity"
+5,"developed, open space"
+6,cultivated crops
+7,pasture/hay
+8,grassland/herbaceous
+9,deciduous forest
+10,evergreen forest
+11,mixed forest
+12,scrub/shrub
+20,barren land
+24,tundra
+25,perennial ice/snow
+13,palustrine forested wetland
+14,palustrine scrub/shrub wetland
+15,palustrine emergent wetland (persistent)
+16,estuarine forested wetland
+17,estuarine scrub/shrub wetland
+18,estuarine emergent wetland
+19,unconsolidated shore
+21,open water
+22,palustrine aquatic bed
+23,estuarine aquatic bed
