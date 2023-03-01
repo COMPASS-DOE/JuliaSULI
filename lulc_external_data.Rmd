@@ -78,6 +78,7 @@ https://coast.noaa.gov/data/digitalcoast/pdf/ccap-class-scheme-regional.pdf
 
 ```{r}
 # load tif file
+# not in GitHub repo because it's a VERY large file - will need to be downloaded to local repository
 ccap <- raster::raster("conus_2016_ccap_landcover_20200311.tif")
 
 # pull CRS of the tif file
@@ -96,7 +97,7 @@ ccap_lat_long <- spTransform(lat_long, ccap_crs)
 
 ```{r}
 # extract land cover information based on lat/long points
-ccap_landcover <- extract(ccap, ccap_lat_long)
+ccap_landcover <- raster::extract(ccap, ccap_lat_long)
 
 # merge this info back with site information
 sample_locations_noNA$ccap_landcover_value <- ccap_landcover
@@ -111,6 +112,55 @@ CCAP_sample_locations <- sample_locations_noNA %>%
 
 ## LANDFIRE Exisiting Vegetation Type Data
 
+Data Description: https://www.landfire.gov/evt.php
+Metadata: https://www.landfire.gov/metadata/lf2020/CONUS/LC20_EVT_220.html
+Download Site: https://www.landfire.gov/version_download.php#
+
 The classification key for this dataset was downloaded from:
 https://www.landfire.gov/CSV/LF2020/LF20_EVC_220.csv
+This document contains LOTS of detail about the vegetation classifications...
+https://www.landfire.gov/documents/LANDFIRE_Ecological_Systems_Descriptions_CONUS.pdf
+
+```{r}
+# load tif file
+# also not in online GitHub repo - too large
+evt <- raster::raster("LC20_EVT_220.tif")
+
+# pull CRS of of the tif file
+evt_crs <- CRS(proj4string(evt))
+
+# reproject lat_long CRS to match tif file
+evt_lat_long <- spTransform(lat_long, evt_crs)
+
+# extract ecosystem information
+evt_ecosystem <- raster::extract(evt, evt_lat_long)
+
+# merge info back with kit location info
+sample_locations_noNA$evt_value <- evt_ecosystem
+
+# load in EVT key
+evt_key <- read_csv("LANDFIRE2020_EVT_classification.csv")
+
+# edit key column names based on data attributes description from source
+colnames(evt_key) <- c("value", "ecological_system_name", "lifeform_code", "fuel_code", 
+                       "fuel_name", "vegetation_lifeform", "vegetation_physiognomy", "vegetation_group_code",
+                       "vegetation_group", "dominant_vegetation_cover_type", "vegetation_order",
+                       "vegetation_class", "vegetation_subclass", "R", "G", "B", "RED", "GREEN", "BLUE")
+
+# cut down on columns to describe the extracted value
+evt_key_edit <- evt_key %>%
+  select(-contains("code"), -contains("fuel"), -R, -G, -B, -RED, -BLUE, -GREEN)
+
+# produce data frame with vegetation type descriptions
+EVT_sample_locations <- sample_locations_noNA %>%
+  select(-ccap_landcover_value) %>%
+  left_join(evt_key_edit, by = c("evt_value" = "value"))
+
+# create data file to double check extracted values
+LC_check <- CCAP_sample_locations %>%
+  select(-ccap_landcover_value) %>%
+  left_join(select(EVT_sample_locations, kit_id:longitude, ecological_system_name),
+            by = c("kit_id", "transect_location", "latitude", "longitude"))
+```
+
 
