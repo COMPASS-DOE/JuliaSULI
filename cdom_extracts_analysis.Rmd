@@ -493,7 +493,3 @@ ggplot(filter(cb_cdom_water_extracts, transect_location == "Water"), aes(x = wat
   geom_point()
 
 ```
-
-
-
-
