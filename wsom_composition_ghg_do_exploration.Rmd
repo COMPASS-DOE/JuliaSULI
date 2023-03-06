@@ -1,0 +1,203 @@
+---
+title: "WSOM and GHG Exploration"
+output: html_document
+date: "2023-03-06"
+---
+
+This file reads in spectral data from WSOM extracts and GHG data from lab experiments.
+The goal is to look at preliminary relationships between the composition of WSOM across
+the transect locations in comparison with metrics related to microbial processing (oxygen consumption, GHG production).
+
+## Set-Up
+
+```{r setup, include=FALSE}
+# load packages
+require(pacman)
+pacman::p_load(tidyverse,
+               janitor,
+               broom,
+               ggpubr, # to use ggarrange for plots
+               ggfortify) # for plotting PCA
+
+# load necessary data
+ghg <- read_csv("./Original Data Files/EC1_GHG_data_PR.csv")
+wsom_cdom <- read_csv("./Original Data Files/EC1_WSOC_Extracts_Nov2022_SpectralIndices.csv")
+```
+
+```{r}
+# set ggplot theme
+theme_set(theme_bw())
+
+# set palette
+palette <- c("#056009","#0385B5","#021677","#ABABD9","#27220F","#8E7941",
+             "#DCCD6A","#8F8D90")
+
+```
+
+
+## Data Frame Edits
+
+```{r edit-wsom-df}
+# pull kit_id and transect location out of cdom sample_id
+wsom_cdom$kit_id <- NA
+wsom_cdom$transect_location <- NA
+
+for (a in 1:nrow(wsom_cdom)) {
+  
+  # pull out the second piece of the sample ID split apart at the underscore and use as the plot
+  wsom_cdom$kit_id[a] <- strsplit(wsom_cdom$Sample_ID, " ")[[a]][1]
+
+  # pull out the fourth piece of that string and use as the timepoint
+  wsom_cdom$transect_location[a] <- strsplit(wsom_cdom$Sample_ID, " ")[[a]][2]
+  
+}
+
+# mutate transect location abbreviations to match ghg data frame
+wsom_cdom_edit <- wsom_cdom %>%
+  mutate(transect_location = case_when(
+    transect_location == "T" ~ "Transition",
+    transect_location == "W" ~ "Wetland",
+    transect_location == "UP" ~ "Upland"
+  )) %>%
+  # remove tea standards
+  filter(!is.na(transect_location))
+
+# create unique list of kit IDs and transect locations
+unique_extracts <- wsom_cdom_edit %>%
+  select(kit_id, transect_location) %>%
+  unique()
+
+```
+
+```{r edit-ghg-df}
+# filter ghg data to just kits that also have extract data
+ghg_filter <- ghg %>%
+  filter(kit_id %in% unique_extracts$kit_id) %>%
+  filter(transect_location %in% unique_extracts$transect_location)
+
+# trim wsom data frame to match ghg and merge the two together
+ghg_wsom_extracts <- wsom_cdom_edit %>%
+  filter(kit_id %in% ghg_filter$kit_id) %>%
+  # remove the replicate rows - could edit to take the average of these rows to move forward
+  filter(!grepl("Rep", Sample_Description)) %>%
+  # select specific indices
+  select(kit_id, transect_location, Sample_ID:SUVA254, S350_400, FI:FRESH) %>%
+  full_join(ghg_filter, by = c("kit_id", "transect_location")) %>%
+  # reorder transect location
+  mutate(transect_location = factor(transect_location, levels = c("Upland", "Transition", "Wetland")))
+
+# make long data frame for the indices to be able to facet the exploratory plots
+ghg_wsom_long <- ghg_wsom_extracts %>%
+  pivot_longer(cols = c(SUVA254:FRESH), names_to = "spectral_index", values_to = "index_value")
+
+```
+
+## Exploratory Plots
+
+### Dissolved Oxygen Consumption
+
+First thoughts - higher rates of DO consumption should correlate with higher levels of microbial processing.
+With more microbial processing, SUVA254 should decline and inversely S350-400 would increase.
+FRESH, FI, and HIX should also increase?!?! The question is are these patterns related to transect location as well?
+
+```{r do-vs-indices-scatterplot}
+# SUVA254
+ggplot(ghg_wsom_extracts, aes(x = delta_do_hr, y = SUVA254, color = transect_location)) +
+  geom_point() +
+  # add limit because of some outliers
+  xlim(0,10) +
+  theme_bw()
+
+# FRESH
+ggplot(ghg_wsom_extracts, aes(x = delta_do_hr, y = FRESH, color = transect_location)) +
+  geom_point() +
+  # add limit because of some outliers
+  xlim(0,10) +
+  theme_bw()
+
+# FI
+ggplot(ghg_wsom_extracts, aes(x = delta_do_hr, y = FI, color = transect_location)) +
+  geom_point() +
+  # add limit because of some outliers
+  xlim(0,10) +
+  theme_bw()
+
+```
+
+```{r do-indices-boxplots}
+# do boxplot
+do <- ggplot(filter(ghg_wsom_extracts, type == "dry")) +
+  geom_boxplot(aes(x = transect_location, y = delta_do_hr, color = transect_location), lwd = 1, fatten = 1, outlier.shape = NA,
+               width = 0.5, show.legend = FALSE) +
+  geom_point(aes(x = transect_location, y = delta_do_hr, color = transect_location), position = position_jitterdodge(), size = 2,
+             show.legend = FALSE) +
+  scale_color_manual(values = palette) +
+  # remove outlier
+  ylim(0,50) +
+  labs(x = "Gradient Location", y = "Dissolved Oxygen Consumption (mg/L/hr)")
+
+# SUVA 254
+suva <- ggplot(filter(ghg_wsom_extracts, type == "dry")) +
+  geom_boxplot(aes(x = transect_location, y = SUVA254, color = transect_location), lwd = 1, fatten = 1, outlier.shape = NA,
+               width = 0.5, show.legend = FALSE) +
+  geom_point(aes(x = transect_location, y = SUVA254, color = transect_location), position = position_jitterdodge(), size = 2,
+             show.legend = FALSE) +
+  scale_color_manual(values = palette) +
+  labs(x = "Gradient Location", y = "Specific UV Absorbance at 254 nm")
+
+# Fluorescence Index
+FI <- ggplot(filter(ghg_wsom_extracts, type == "dry")) +
+  geom_boxplot(aes(x = transect_location, y = FI, color = transect_location), lwd = 1, fatten = 1, outlier.shape = NA,
+               width = 0.5, show.legend = FALSE) +
+  geom_point(aes(x = transect_location, y = FI, color = transect_location), position = position_jitterdodge(), size = 2,
+             show.legend = FALSE) +
+  scale_color_manual(values = palette) +
+  labs(x = "Gradient Location", y = "Fluorescence Index")
+
+# combine all plots together
+ggarrange(do, suva, FI)
+
+```
+
+### PCA with Spectral Indices and GHG/DO Information
+
+```{r calc-pc}
+# pull variables of interest for PCA analysis
+ghg_wsom_wet_only <- ghg_wsom_extracts %>%
+  filter(type == "wet")
+
+pca_ghg_wsom <- ghg_wsom_wet_only %>%
+  select(SUVA254:FRESH, delta_do_hr:d_pn2o)
+
+# calculate the principal components
+pc <- prcomp(pca_ghg_wsom, scale = TRUE)
+
+# reverse signs of eigenvectors
+pc$rotation <- -1*pc$rotation
+
+# look at the principal components
+pc$rotation
+
+# reverse signs of each observation's principal components scores
+pc$x <- -1*pc$x
+
+# calculate variance represented by each of the principal components
+pc$sdev^2 / sum(pc$sdev^2)
+```
+
+```{r plot-pca}
+pca_plot <- autoplot(pc, data = ghg_wsom_wet_only, colour = "transect_location",
+                     frame = T, size = 3, loadings = TRUE,
+                     loadings.colour = "black", loadings.label = TRUE,
+                     loadings.label.colour = "black",
+                     loadings.label.vjust = -0.5,
+                     loadings.label.hjust = -0.2) # negative values move right and up
+
+pca_plot + scale_fill_manual(values = palette) +
+  scale_color_manual(values = palette) +
+  labs(color = "Gradient Location", fill = "Gradient Location")
+
+```
+
+
+
