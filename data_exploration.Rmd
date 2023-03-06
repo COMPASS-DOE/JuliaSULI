@@ -124,8 +124,6 @@ ggplot(data = usa) +
   geom_label(data = water, aes(x = water_longitude, y = water_latitude, label = kit_id))
 # geom_label has to be fed the aesthetics to replace a point with the name of the point
 
-ggplot(data = gl) +
-  geom_sf()
 ```
 
 ```{r}
