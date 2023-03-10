@@ -1,0 +1,250 @@
+kit_id,transect_location,latitude,longitude,ccap_landcover_value,point_land_cover_class,new_ccap_landcover_value,surrounding_land_cover_class
+K001,Water,41.6228,-83.2362,15,palustrine emergent wetland (persistent),NA,NA
+K001,Sediment,41.6228,-83.2362,15,palustrine emergent wetland (persistent),NA,NA
+K001,Wetland,41.62182,-83.23883,15,palustrine emergent wetland (persistent),NA,NA
+K001,Transition,41.62186,-83.23813,15,palustrine emergent wetland (persistent),NA,NA
+K001,Upland,41.61511,-83.22979,14,palustrine scrub/shrub wetland,NA,NA
+K004,Water,41.502,-83.0435,15,palustrine emergent wetland (persistent),NA,NA
+K004,Sediment,41.502,-83.0435,15,palustrine emergent wetland (persistent),NA,NA
+K004,Wetland,41.5018,-83.0443,15,palustrine emergent wetland (persistent),NA,NA
+K004,Transition,41.5018,-83.0456,15,palustrine emergent wetland (persistent),NA,NA
+K004,Upland,41.5015,-83.0462,15,palustrine emergent wetland (persistent),NA,NA
+K007,Water,41.3771,-82.5102,15,palustrine emergent wetland (persistent),NA,NA
+K007,Sediment,41.3771,-82.5102,15,palustrine emergent wetland (persistent),NA,NA
+K007,Wetland,41.3759,-82.50713,13,palustrine forested wetland,NA,NA
+K007,Transition,41.37591,-82.5064,13,palustrine forested wetland,NA,NA
+K007,Upland,41.3762,-82.50666,9,deciduous forest,NA,NA
+K008,Water,41.3824,-82.5147,4,"developed, low intensity",NA,NA
+K008,Sediment,41.3824,-82.5147,4,"developed, low intensity",NA,NA
+K008,Wetland,41.3826,-82.5148,4,"developed, low intensity",NA,NA
+K008,Transition,41.3827,-82.515,4,"developed, low intensity",NA,NA
+K008,Upland,41.3827,-82.515,4,"developed, low intensity",NA,NA
+K009,Water,41.3754,-82.5164,13,palustrine forested wetland,NA,NA
+K009,Sediment,41.3754,-82.5164,13,palustrine forested wetland,NA,NA
+K009,Wetland,41.3746,-82.5167,20,barren land,NA,NA
+K009,Transition,41.3745,-82.5169,20,barren land,NA,NA
+K009,Upland,41.3747,-82.517,20,barren land,NA,NA
+K010,Water,41.3734,-82.5091,13,palustrine forested wetland,NA,NA
+K010,Sediment,41.3733,-82.5092,15,palustrine emergent wetland (persistent),NA,NA
+K010,Wetland,41.3731,-82.5083,13,palustrine forested wetland,NA,NA
+K010,Transition,41.3731,-82.5076,13,palustrine forested wetland,NA,NA
+K010,Upland,41.3732,-82.5075,13,palustrine forested wetland,NA,NA
+K011,Water,41.3772,-82.51,15,palustrine emergent wetland (persistent),NA,NA
+K011,Sediment,41.3772,-82.51,15,palustrine emergent wetland (persistent),NA,NA
+K011,Wetland,41.3765,-82.5081,13,palustrine forested wetland,NA,NA
+K011,Transition,41.3765,-82.5081,13,palustrine forested wetland,NA,NA
+K011,Upland,41.3865,-82.5082,21,open water,NA,NA
+K012,Water,43.5831,-83.688,13,palustrine forested wetland,NA,NA
+K012,Sediment,43.5831,-83.688,13,palustrine forested wetland,NA,NA
+K012,Wetland,43.583,-83.6882,13,palustrine forested wetland,NA,NA
+K013,Water,43.9688,-83.8603,4,"developed, low intensity",NA,NA
+K013,Sediment,43.9688,-83.8603,4,"developed, low intensity",NA,NA
+K013,Wetland,43.9687,-83.8619,13,palustrine forested wetland,NA,NA
+K013,Transition,43.9687,-83.862,13,palustrine forested wetland,NA,NA
+K013,Upland,43.9687,-83.8621,13,palustrine forested wetland,NA,NA
+K014,Water,39.6696,-75.4661,18,estuarine emergent wetland,NA,NA
+K014,Sediment,39.6699,-75.4661,18,estuarine emergent wetland,NA,NA
+K015,Water,37.4147,-76.7161,18,estuarine emergent wetland,NA,NA
+K015,Sediment,37.4147,-76.7161,18,estuarine emergent wetland,NA,NA
+K015,Wetland,37.4144,-76.7153,18,estuarine emergent wetland,NA,NA
+K015,Transition,37.4142,-76.715,13,palustrine forested wetland,NA,NA
+K015,Upland,37.4142,-76.715,13,palustrine forested wetland,NA,NA
+K016,Water,37.3044,-76.5539,18,estuarine emergent wetland,NA,NA
+K016,Sediment,37.3044,-76.5539,18,estuarine emergent wetland,NA,NA
+K016,Wetland,37.3045,-76.5536,18,estuarine emergent wetland,NA,NA
+K016,Transition,37.3047,-76.553,21,open water,NA,NA
+K016,Upland,37.3047,-76.5529,21,open water,10,evergreen forest
+K017,Water,37.5678,-76.8867,18,estuarine emergent wetland,NA,NA
+K017,Sediment,37.5678,-76.8867,18,estuarine emergent wetland,NA,NA
+K017,Wetland,37.5687,-76.8869,13,palustrine forested wetland,NA,NA
+K017,Transition,37.5687,-76.8871,15,palustrine emergent wetland (persistent),NA,NA
+K017,Upland,37.5687,-76.887200000000007,15,palustrine emergent wetland (persistent),NA,NA
+K018,Water,37.2192,-76.4136,18,estuarine emergent wetland,NA,NA
+K018,Sediment,37.2192,-76.4136,18,estuarine emergent wetland,NA,NA
+K018,Wetland,37.2192,-76.4136,18,estuarine emergent wetland,NA,NA
+K018,Transition,37.2197,-76.4133,18,estuarine emergent wetland,NA,NA
+K018,Upland,37.22,-76.4128,13,palustrine forested wetland,NA,NA
+K019,Water,46.6533,-92.2266,21,open water,NA,NA
+K019,Sediment,46.6532,-92.2266,21,open water,NA,NA
+K019,Wetland,46.6534,-92.2267,14,palustrine scrub/shrub wetland,NA,NA
+K019,Transition,46.6536,-92.2269,14,palustrine scrub/shrub wetland,NA,NA
+K019,Upland,46.6536,-92.2268,14,palustrine scrub/shrub wetland,NA,NA
+K020,Water,46.8143,-92.0515,4,"developed, low intensity",NA,NA
+K020,Upland,46.8145,-92.0515,5,"developed, open space",NA,NA
+K021,Water,41.6056,-83.1526,15,palustrine emergent wetland (persistent),NA,NA
+K021,Sediment,41.6056,-83.1526,15,palustrine emergent wetland (persistent),NA,NA
+K021,Wetland,41.6054,-83.1533,15,palustrine emergent wetland (persistent),NA,NA
+K021,Transition,41.6053,-83.1536,15,palustrine emergent wetland (persistent),NA,NA
+K021,Upland,41.6053,-83.1537,15,palustrine emergent wetland (persistent),NA,NA
+K022,Water,41.4629,-82.9971,15,palustrine emergent wetland (persistent),NA,NA
+K022,Sediment,41.4629,-82.9971,15,palustrine emergent wetland (persistent),NA,NA
+K022,Wetland,41.4626,-82.9973,15,palustrine emergent wetland (persistent),NA,NA
+K022,Transition,41.4623,-82.9974,15,palustrine emergent wetland (persistent),NA,NA
+K022,Upland,41.4621,-82.9974,15,palustrine emergent wetland (persistent),NA,NA
+K023,Water,38.8014,-76.7033,15,palustrine emergent wetland (persistent),NA,NA
+K023,Sediment,38.8158,-76.7033,15,palustrine emergent wetland (persistent),NA,NA
+K023,Wetland,38.8014,-76.7031,15,palustrine emergent wetland (persistent),NA,NA
+K023,Upland,38.7511,-76.7019,6,cultivated crops,NA,NA
+K024,Water,38.2087,-75.8044,18,estuarine emergent wetland,NA,NA
+K024,Sediment,38.2087,-75.8044,18,estuarine emergent wetland,NA,NA
+K024,Wetland,38.2088,-75.8044,18,estuarine emergent wetland,NA,NA
+K024,Transition,38.2105,-75.8056,10,evergreen forest,NA,NA
+K024,Upland,38.2108,-75.8054,10,evergreen forest,NA,NA
+K025,Water,38.8873,-76.5621,14,palustrine scrub/shrub wetland,NA,NA
+K025,Sediment,38.8873,-76.5621,14,palustrine scrub/shrub wetland,NA,NA
+K025,Wetland,38.8873,-76.5621,14,palustrine scrub/shrub wetland,NA,NA
+K025,Transition,38.8873,-76.5621,14,palustrine scrub/shrub wetland,NA,NA
+K025,Upland,38.8872,-76.5623,14,palustrine scrub/shrub wetland,NA,NA
+K026,Water,37.7106,-75.6117,10,evergreen forest,NA,NA
+K026,Sediment,37.7106,-75.6117,10,evergreen forest,NA,NA
+K026,Wetland,37.712,-75.6102,13,palustrine forested wetland,NA,NA
+K026,Transition,37.7128,-75.6086,6,cultivated crops,NA,NA
+K026,Upland,37.7129,-75.6085,6,cultivated crops,NA,NA
+K027,Water,37.9914,-75.8238,18,estuarine emergent wetland,NA,NA
+K027,Sediment,37.9914,-75.8238,18,estuarine emergent wetland,NA,NA
+K027,Wetland,37.9927,-75.8221,12,scrub/shrub,NA,NA
+K027,Transition,37.9923,-75.8218,6,cultivated crops,NA,NA
+K027,Upland,37.9917,-75.8216,6,cultivated crops,NA,NA
+K029,Water,39.4188,-75.3786,13,palustrine forested wetland,NA,NA
+K029,Sediment,39.4188,-75.3786,13,palustrine forested wetland,NA,NA
+K029,Wetland,39.4188,-75.3786,13,palustrine forested wetland,NA,NA
+K029,Transition,39.4187,-75.3786,13,palustrine forested wetland,NA,NA
+K029,Upland,39.4185,-75.3788,13,palustrine forested wetland,NA,NA
+K030,Water,39.0884,-75.4374,18,estuarine emergent wetland,NA,NA
+K030,Sediment,39.0884,-75.4374,18,estuarine emergent wetland,NA,NA
+K030,Wetland,39.0881,-75.4375,18,estuarine emergent wetland,NA,NA
+K030,Upland,39.0885,-75.438,14,palustrine scrub/shrub wetland,NA,NA
+K033,Water,47.1041,-88.5153,14,palustrine scrub/shrub wetland,NA,NA
+K033,Sediment,47.1041,-88.5153,14,palustrine scrub/shrub wetland,NA,NA
+K033,Wetland,47.1043,-88.516,15,palustrine emergent wetland (persistent),NA,NA
+K033,Upland,47.1041,-88.517,9,deciduous forest,NA,NA
+K034,Water,38.7746,-75.9752,13,palustrine forested wetland,NA,NA
+K034,Sediment,38.7746,-75.9752,13,palustrine forested wetland,NA,NA
+K034,Wetland,38.7745,-75.9753,9,deciduous forest,NA,NA
+K034,Transition,38.7744,-75.9753,9,deciduous forest,NA,NA
+K034,Upland,38.7743,-75.9754,9,deciduous forest,NA,NA
+K035,Water,38.5922,-76.1307,18,estuarine emergent wetland,NA,NA
+K035,Sediment,38.5922,-76.1307,18,estuarine emergent wetland,NA,NA
+K035,Wetland,38.5922,-76.1307,18,estuarine emergent wetland,NA,NA
+K035,Transition,38.5922,-76.1302,13,palustrine forested wetland,NA,NA
+K035,Upland,38.5922,-76.13,13,palustrine forested wetland,NA,NA
+K036,Water,39.0412,-76.2218,18,estuarine emergent wetland,NA,NA
+K036,Sediment,39.0412,-76.2218,18,estuarine emergent wetland,NA,NA
+K036,Wetland,39.0385,-76.2239,18,estuarine emergent wetland,NA,NA
+K036,Transition,39.0381,-76.2242,18,estuarine emergent wetland,NA,NA
+K036,Upland,39.0379,-76.2244,18,estuarine emergent wetland,NA,NA
+K037,Water,37.5569,-76.9731,13,palustrine forested wetland,NA,NA
+K037,Sediment,37.5569,-76.9731,13,palustrine forested wetland,NA,NA
+K037,Wetland,37.5569,-76.9731,13,palustrine forested wetland,NA,NA
+K038,Water,37.3264,-77.2078,13,palustrine forested wetland,NA,NA
+K038,Sediment,37.3264,-77.2078,13,palustrine forested wetland,NA,NA
+K038,Wetland,37.3267,-77.2078,13,palustrine forested wetland,NA,NA
+K038,Upland,37.3267,-77.2072,11,mixed forest,NA,NA
+K039,Water,43.7621,-86.4077,15,palustrine emergent wetland (persistent),NA,NA
+K039,Sediment,43.7621,-86.4077,15,palustrine emergent wetland (persistent),NA,NA
+K039,Wetland,43.7618,-86.4075,15,palustrine emergent wetland (persistent),NA,NA
+K039,Transition,43.7604,-86.4078,14,palustrine scrub/shrub wetland,NA,NA
+K039,Upland,43.7568,-86.4049,9,deciduous forest,NA,NA
+K040,Water,37.4559,-75.8335,18,estuarine emergent wetland,NA,NA
+K040,Sediment,37.4559,-75.8335,18,estuarine emergent wetland,NA,NA
+K040,Wetland,37.4566,-75.8332,21,open water,18,estuarine emergent wetland
+K040,Transition,37.4644,-75.8358,13,palustrine forested wetland,NA,NA
+K040,Upland,37.4654,-75.8356,13,palustrine forested wetland,NA,NA
+K041,Water,37.4557,-75.8334,18,estuarine emergent wetland,NA,NA
+K041,Sediment,37.4557,-75.8334,18,estuarine emergent wetland,NA,NA
+K041,Wetland,37.4557,-75.8334,18,estuarine emergent wetland,NA,NA
+K041,Transition,37.4638,-75.8357,13,palustrine forested wetland,NA,NA
+K041,Upland,37.4656,-75.835,13,palustrine forested wetland,NA,NA
+K042,Water,39.8816,-75.2665,21,open water,NA,NA
+K042,Sediment,38.8816,-75.2665,21,open water,NA,NA
+K042,Wetland,39.8816,-75.265,15,palustrine emergent wetland (persistent),NA,NA
+K042,Transition,39.8815,-75.2648,15,palustrine emergent wetland (persistent),NA,NA
+K042,Upland,39.8815,-75.2646,15,palustrine emergent wetland (persistent),NA,NA
+K043,Water,39.062,-75.394,21,open water,NA,NA
+K043,Sediment,39.062,-75.397,20,barren land,NA,NA
+K044,Water,38.8837,-76.5583,18,estuarine emergent wetland,NA,NA
+K044,Sediment,38.8837,-76.5583,18,estuarine emergent wetland,NA,NA
+K044,Wetland,38.8841,-76.5582,13,palustrine forested wetland,NA,NA
+K044,Transition,38.8842,-76.5583,13,palustrine forested wetland,NA,NA
+K044,Upland,38.8843,-76.5583,13,palustrine forested wetland,NA,NA
+K045,Water,39.9886,-74.8467,18,estuarine emergent wetland,NA,NA
+K045,Sediment,39.9887,-74.8466,15,palustrine emergent wetland (persistent),NA,NA
+K045,Wetland,39.9889,-74.8465,15,palustrine emergent wetland (persistent),NA,NA
+K045,Transition,39.9905,-74.8443,13,palustrine forested wetland,NA,NA
+K045,Upland,39.991,-74.8434,13,palustrine forested wetland,NA,NA
+K046,Water,39.0892,-75.4365,18,estuarine emergent wetland,NA,NA
+K046,Sediment,39.0892,-75.4365,18,estuarine emergent wetland,NA,NA
+K046,Wetland,39.089,-75.4366,18,estuarine emergent wetland,NA,NA
+K046,Upland,39.0887,-75.4351,15,palustrine emergent wetland (persistent),NA,NA
+K047,Water,43.4162,-86.3489,15,palustrine emergent wetland (persistent),NA,NA
+K047,Sediment,43.4162,-86.3489,15,palustrine emergent wetland (persistent),NA,NA
+K047,Wetland,43.4169,-86.35,15,palustrine emergent wetland (persistent),NA,NA
+K047,Transition,43.4166,-86.3508,13,palustrine forested wetland,NA,NA
+K047,Upland,43.4161,-86.3521,15,palustrine emergent wetland (persistent),NA,NA
+K048,Water,39.8803,-75.2667,21,open water,NA,NA
+K048,Sediment,39.8803,-75.2667,21,open water,NA,NA
+K048,Wetland,39.8802,-75.2669,21,open water,NA,NA
+K048,Transition,39.8801,-75.2666,14,palustrine scrub/shrub wetland,NA,NA
+K048,Upland,39.88,-75.2665,14,palustrine scrub/shrub wetland,NA,NA
+K049,Water,42.6708,-86.2107,20,barren land,NA,NA
+K049,Sediment,42.6708,-86.2107,20,barren land,NA,NA
+K049,Wetland,42.6708,-86.2106,20,barren land,NA,NA
+K049,Transition,42.6709,-86.2106,20,barren land,NA,NA
+K049,Upland,42.6709,-86.2105,20,barren land,NA,NA
+K050,Water,37.3344,-77.2072,18,estuarine emergent wetland,NA,NA
+K050,Sediment,37.3344,-77.2072,18,estuarine emergent wetland,NA,NA
+K050,Wetland,37.3347,-77.2069,20,barren land,NA,NA
+K050,Transition,37.3347,-77.2058,21,open water,9,deciduous forest
+K050,Upland,37.3347,-77.2058,21,open water,9,deciduous forest
+K051,Water,38.5747,-76.2191,4,"developed, low intensity",NA,NA
+K051,Sediment,38.5747,-76.2191,4,"developed, low intensity",NA,NA
+K051,Wetland,38.5747,-76.2194,13,palustrine forested wetland,NA,NA
+K051,Transition,38.5747,-76.2191,4,"developed, low intensity",NA,NA
+K051,Upland,38.5746,-76.2185,6,cultivated crops,NA,NA
+K052,Water,38.1595,-75.7905,18,estuarine emergent wetland,NA,NA
+K052,Sediment,38.1595,-75.7904,18,estuarine emergent wetland,NA,NA
+K052,Wetland,38.1596,-75.7899,18,estuarine emergent wetland,NA,NA
+K052,Transition,38.1604,-75.7899,6,cultivated crops,NA,NA
+K052,Upland,38.1609,-75.7906,6,cultivated crops,NA,NA
+K053,Water,38.812,-76.7083,15,palustrine emergent wetland (persistent),NA,NA
+K053,Sediment,38.8121,-76.7082,15,palustrine emergent wetland (persistent),NA,NA
+K053,Wetland,38.812,-76.708,13,palustrine forested wetland,NA,NA
+K053,Transition,38.812,-76.7061,9,deciduous forest,NA,NA
+K053,Upland,38.812,-76.7061,9,deciduous forest,NA,NA
+K054,Water,38.9677,-75.3703,18,estuarine emergent wetland,NA,NA
+K054,Sediment,38.9677,-75.3703,18,estuarine emergent wetland,NA,NA
+K054,Wetland,38.968,-75.37,13,palustrine forested wetland,NA,NA
+K054,Transition,38.9681,-75.3698,13,palustrine forested wetland,NA,NA
+K054,Upland,38.9683,-75.3697,13,palustrine forested wetland,NA,NA
+K055,Water,39.8055,-75.2077,4,"developed, low intensity",NA,NA
+K055,Sediment,39.8055,-75.2077,4,"developed, low intensity",NA,NA
+K055,Upland,39.8057,-75.2103,9,deciduous forest,NA,NA
+K056,Water,39.1838,-74.8511,18,estuarine emergent wetland,NA,NA
+K056,Sediment,39.1838,-74.8511,18,estuarine emergent wetland,NA,NA
+K056,Wetland,39.1838,-74.8511,18,estuarine emergent wetland,NA,NA
+K056,Transition,39.1836,-74.8517,18,estuarine emergent wetland,NA,NA
+K056,Upland,39.1837,-74.8518,18,estuarine emergent wetland,NA,NA
+K057,Water,39.1683,-75.5211,3,"developed, medium intensity",NA,NA
+K058,Water,39.2576,-75.0905,18,estuarine emergent wetland,NA,NA
+K058,Sediment,39.2576,-75.0905,18,estuarine emergent wetland,NA,NA
+K058,Wetland,39.2575,-75.0904,18,estuarine emergent wetland,NA,NA
+K058,Transition,39.2574,-75.0903,13,palustrine forested wetland,NA,NA
+K058,Upland,39.3574,-75.0903,9,deciduous forest,NA,NA
+K059,Water,38.4292,-76.2374,3,"developed, medium intensity",NA,NA
+K059,Sediment,38.4292,-76.2374,3,"developed, medium intensity",NA,NA
+K059,Wetland,38.4295,-76.2269,18,estuarine emergent wetland,NA,NA
+K059,Transition,38.4303,-76.2269,14,palustrine scrub/shrub wetland,NA,NA
+K059,Upland,38.4305,-76.2265,13,palustrine forested wetland,NA,NA
+K060,Water,39.3259,-75.4749,15,palustrine emergent wetland (persistent),NA,NA
+K060,Sediment,39.325,-75.479,18,estuarine emergent wetland,NA,NA
+K060,Wetland,39.3123,-75.4961,4,"developed, low intensity",NA,NA
+K061,Water,39.2157,-75.4618,18,estuarine emergent wetland,NA,NA
+K061,Sediment,39.2157,-75.4618,18,estuarine emergent wetland,NA,NA
+K061,Wetland,39.2153,-75.4609,18,estuarine emergent wetland,NA,NA
+K061,Transition,39.2152,-75.4607,6,cultivated crops,NA,NA
+K061,Upland,39.2151,-75.4605,6,cultivated crops,NA,NA
+K062,Water,38.8753,-76.5513,21,open water,NA,NA
+K062,Sediment,38.8753,-76.5513,21,open water,NA,NA
+K062,Wetland,38.8751,-76.5515,18,estuarine emergent wetland,NA,NA
+K062,Transition,38.8747,-76.5516,13,palustrine forested wetland,NA,NA
+K062,Upland,38.8743,-76.5515,18,estuarine emergent wetland,NA,NA
