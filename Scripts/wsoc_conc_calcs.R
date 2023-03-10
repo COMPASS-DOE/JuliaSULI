@@ -16,38 +16,39 @@ require(tidyverse)
 getwd()
 
 # load in csv files
-wsoc_masses <- read.csv("./wsoc_extracts_masses.csv", na.strings = "N/A")
-wsoc_npoc_tdn <- read.csv("./Processed Data/EC1_WSOC_Extracts_NPOC_TDN_L0B_20221118.csv")
+wsom_masses <- read_csv("./WSOM Extracts Data/wsoc_extracts_masses.csv")
+wsom_npoc_tdn <- read_csv("./WSOM Extracts Data/EC1_WSOM_Extracts_NPOC_TDN_L0B.csv")
 
 # read in soils RDS file for GWC
-soils_all <- readRDS("./Original Data Files/soils_data_merged_withmeta.rds")
+soils_all <- readRDS("./Downloaded Data/soils_data_merged_withmeta.rds")
 
 
 ## 2. Merge Data Files ---------------------------------------------------------
 
 # pull out necessary GWC values for back calculation to field moist soils
 extracts_gwc <- soils_all %>%
-  filter(kit_id %in% substr(wsoc_npoc_tdn$kit_id,1,4) & 
-           transect_location %in% wsoc_npoc_tdn$transect_location) %>%
+  filter(kit_id %in% substr(wsom_npoc_tdn$kit_id,1,4) & 
+           transect_location %in% wsom_npoc_tdn$transect_location) %>%
   select(kit_id, transect_location, gwc_perc)
 
 # add GWC to the npoc/tdn data frame
-wsoc_npoc_tdn <- left_join(wsoc_npoc_tdn, extracts_gwc, by =
+wsom_npoc_tdn <- left_join(wsom_npoc_tdn, extracts_gwc, by =
                              c("kit_id", "transect_location"))
 
 # make sure replicate kits are named that way
-for (n in 1:nrow(wsoc_npoc_tdn)) {
-  old_name <- wsoc_npoc_tdn[n,"kit_id"]
+for (n in 1:nrow(wsom_npoc_tdn)) {
+  
+  old_name <- wsom_npoc_tdn[n,"kit_id"]
   
   # find the rows with "_rep" in the sample name
-  if (grepl("_rep", wsoc_npoc_tdn[n,1])) {
+  if (grepl("_rep", wsom_npoc_tdn[n,4])) {
     
-    wsoc_npoc_tdn[n,"kit_id"] <- paste0(old_name, "_rep")
+    wsom_npoc_tdn[n,"kit_id"] <- paste0(old_name, "_rep")
   }
 }
 
 # merge by kit_id
-wsom_extracts_withblanks <- left_join(wsoc_npoc_tdn, wsoc_masses, by = 
+wsom_extracts_withblanks <- left_join(wsom_npoc_tdn, wsom_masses, by = 
                                         c("kit_id", "transect_location"))
 
 # remove blanks (npoc/tdn data has already been blank corrected)
@@ -64,7 +65,10 @@ water_density <- 0.99777 # density of water @ room temp 22C (g/mL)
 water_density_gL <- water_density*1000
 
 # calculate L of water used for extraction
-wsom_extracts$water_L <- wsom_extracts$water_mass / water_density_gL
+wsom_extracts <- wsom_extracts %>%
+  mutate(water_mass = as.numeric(water_mass),
+         soil_mass = as.numeric(soil_mass)) %>%
+  mutate(water_L = water_mass / water_density_gL)
 
 # apply formula to get mg WSOM/g dry soil of carbon and nitrogen
 wsom_extracts <- wsom_extracts %>%
@@ -82,7 +86,7 @@ wsom_extracts <- wsom_extracts %>%
          wson_conc_field = (tdn_mgl*water_L)/field_soil)
 
 # write out full concentrations data frame as csv
-write.csv(wsom_extracts, "./Processed Data/wsom_extracts_wsoc_wson_conc.csv")
+#write_csv(wsom_extracts, "./WSOM Extracts Data/wsom_extracts_wsoc_wson_conc.csv")
 
 
 ## 4. Calculate Kit Replicate % Error and Average Concentrations ---------------
@@ -157,15 +161,14 @@ for (i in 1:nrow(rep_list)) {
 }
 
 # write out the perc error calcs
-write.csv(npoc_tdn_perc_diff, "./Processed Data/wsom_extracts_npoc_tdn_perc_error_calcs.csv")
+#write_csv(npoc_tdn_perc_diff, "./WSOM Extracts Data/wsom_extracts_npoc_tdn_perc_error_calcs.csv")
 
 
 ## 5. Replace Replicate Kit Concentrations w/ Averages -------------------------
 
 # remove replicate rows and cut out unnecessary columns
 wsom_extracts_noreps <- wsom_extracts %>%
-  filter(!grepl("_rep", kit_id)) %>%
-  select(-c(1:3,9:11))
+  filter(!grepl("_rep", kit_id))
 
 # make replacement data frame
 wsom_extracts_noreps_replaced <- wsom_extracts_noreps
@@ -204,4 +207,4 @@ for (x in 1:nrow(kit_replicates_averages)) {
 wsom_conc <- wsom_extracts_noreps_replaced %>%
   select(-c(npoc_mgl,tdn_mgl,water_L,field_soil))
 
-write_rds(wsom_conc, "./R Data Files/wsom_conc.rds")
+#write_csv(wsom_conc, "./WSOM Extracts Data/wsom_conc_rep_avg.csv")

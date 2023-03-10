@@ -21,74 +21,30 @@ library(janitor)
 library(readxl)
 ```
 
-```{r}
-# build RData file for starting files - files imported in from csv downloads
-# save(sample_collection_metadata, water_NPOC_TDN, site_metadata, water_spectral_indices, soil, water_spectral_indices_part2, file = "EC1_raw_data.RData")
+### Load Data
 
-load("EC1_raw_data.RData") 
-# brings RData files into the environment!
+```{r}
+# load massive .rds file with ALL the exchange data
+water_soil <- readRDS("./EC1_water_soil_data.rds")
+
 ```
 
-## Data Preparation
+### Data Preparation
 
 ```{r}
-# simplify data frame to include coordinates and N/C metrics
-water_sample_metadata <- sample_collection_metadata[, c(1:3, 7)]
-water <- left_join(water_NPOC_TDN, water_sample_metadata, by = "kit_id")
-water <- left_join(water, site_metadata, by = "kit_id")
+# fix kit 41 metadata - region and water_body should be Chesapeake Bay
+water_soil[water_soil$kit_id == "K041", 6] <- "Chesapeake Bay"
+water_soil[water_soil$kit_id == "K041", 7] <- "Chesapeake Bay"
 
-# save a separate RData file for the site data!
-water_sites <- sample_collection_metadata[,c(1:3)]
-# save(water_sites, file = "water_collection_lat_long.RData")
-
-# add a new variable to look at the major water body where samples were taken, not just the region
-water <- water %>%
-  mutate(water_body = case_when(
-    state == "VA" | state == "MD" ~ "Chesapeake Bay",
-    state == "DE" | state == "PA" | state == "NJ" ~ "Delaware Bay",
-    kit_id == "K019" | kit_id == "K020" | kit_id == "K033" | kit_id == "K012" | kit_id == "K013" | kit_id == "K039" | kit_id == "K047" | kit_id == "K049" | state == "OH" ~ "Great Lakes"
-  ))
-
-# edit a few rows of the water type column
-water$water_systemtype[11] <- "Tidal River/Estuary"
-water$water_systemtype[23] <- "Tidal River/Lacestuary"
-water$water_systemtype[43] <- "Tidal River"
-water$water_systemtype[45] <- "Tidal Stream"
+# simplify giant dataset to just water data
+water <- water_soil %>%
+  select(kit_id, region, contains("water")) %>%
+  unique() %>%
+  filter(!is.na(water_latitude))
 
 # set water type to factor variable
 water$water_systemtype <- as.factor(water$water_systemtype)
 
-# cut the dataset to the columns needed to make a map
-water_map <- water[,c(3,5,6,9,10,11,15,21)]
-
-# edit second CDOM dataset for better merging
-colnames(water_spectral_indices_part2)[1] <- "kit_id"
-water_spectral_indices_part2 <- water_spectral_indices_part2[,-2]
-
-water_spectral_indices_part2$campaign <- "EC1"
-water_spectral_indices_part2$transect_location <- "water"
-
-# bring in the second set of CDOM data
-water_spectral_indices_final <- rbind(water_spectral_indices, water_spectral_indices_part2)
-
-# match up the spectral data with location of sites and DOC
-water_CDOM <- left_join(water, water_spectral_indices_final, by = c("kit_id", "campaign", "transect_location"))
-
-# pull out the kits without CDOM data to remove NAs - should just be 2 now with updated data
-water_CDOM_final <- water_CDOM %>%
-  filter(!is.na(SUVA254))
-
-# remove additional columns for dataset ready for analysis
-water_CDOM_final <- water_CDOM_final[,c(3,5,6,9:11,14,15,21:23,25,27:32)]
-
-# make a list of the sites missing CDOM data
-water_CDOM_missing <- water_CDOM %>%
-  filter(is.na(SUVA254))
-
-water_CDOM_missing <- water_CDOM_missing[,c(3,21)]
-
-# remove kit 41 - can be replaced once that metadata is filled in
-water_CDOM_final <- water_CDOM_final[-30,]
 ```
 
 ## Load In More Packages for Mapping
@@ -116,7 +72,7 @@ gl <- ne_states(country = c("United States of America", "Canada"), returnclass =
 # getting error message here to get more detail map attributes - address later!!
 # https://www.naturalearthdata.com/downloads/10m-physical-vectors/ <- website for data downloads
 
-# all water sampling locations plotted!
+# all water sampling locations plotted - test out geom_label()
 ggplot(data = usa) +
   geom_sf() +
   coord_sf(xlim = c(-95,-75), ylim = c(35,50)) + # set coordinate boundaries
@@ -138,7 +94,7 @@ GL_water <- water %>%
 ggplot(data = usa) +
   geom_sf() +
   coord_sf(xlim = c(-77.5,-74.5), ylim = c(37.2,40)) +
-  geom_point(data = CB_water, mapping = aes(x = water_longitude, y = water_latitude, color = npoc_mgl)) + 
+  geom_point(data = CB_water, mapping = aes(x = water_longitude, y = water_latitude, color = water_npoc_mgl)) + 
   # add points from another data frame
   theme_bw() +
   labs(x = "Longitude", y = "Latitude", color = "NPOC (mg/L)")
@@ -147,14 +103,14 @@ ggplot(data = usa) +
 ggplot(data = gl) +
   geom_sf() +
   coord_sf(xlim = c(-92,-82), ylim = c(40,48)) +
-  geom_point(data = GL_water, mapping = aes(x = water_longitude, y = water_latitude, color = npoc_mgl)) +
+  geom_point(data = GL_water, mapping = aes(x = water_longitude, y = water_latitude, color = water_npoc_mgl)) +
   theme_bw() +
   labs(x = "Longitude", y = "Latitude", color = "NPOC (mg/L)")
 ```
 
 ```{r}
 # extra rough scatterplot to look if there are regional clusters in DOC concentrations for water
-ggplot(na.omit(water_map), aes(x = water_latitude, y = npoc_mgl, color = water_body)) +
+ggplot(filter(water, !is.na(water_npoc_mgl)), aes(x = water_latitude, y = water_npoc_mgl, color = water_body)) +
   geom_point() +
   theme_bw()
 ```
@@ -163,7 +119,7 @@ ggplot(na.omit(water_map), aes(x = water_latitude, y = npoc_mgl, color = water_b
 
 ```{r}
 # SUVA254 vs S350-400
-ggplot(water_CDOM_final, aes(x = SUVA254, y = S350_400)) +
+ggplot(water, aes(x = water_SUVA254, y = water_S350_400)) +
   geom_point() +
   theme_bw() +
   stat_cor()
@@ -171,7 +127,7 @@ ggplot(water_CDOM_final, aes(x = SUVA254, y = S350_400)) +
 
 ```{r}
 # S350-400 vs S275-295
-ggplot(water_CDOM_final, aes(x = S275_295, y = S350_400)) +
+ggplot(water, aes(x = water_S275_295, y = water_S350_400)) +
   geom_point() +
   theme_bw() +
   stat_cor()
@@ -180,7 +136,11 @@ ggplot(water_CDOM_final, aes(x = S275_295, y = S350_400)) +
 ```{r}
 # building a correlation plot!
 # prepping data frame with just the variables for calculated correlations
-water_corr_plot <- water_CDOM_final[,c(10:18)]
+water_corr_plot <- water %>%
+  select(water_SUVA254, water_S275_295, water_S350_400, water_Sr:water_BIX) %>%
+  filter(!is.na(water_SUVA254))
+
+colnames(water_corr_plot) <- gsub("water_", "", colnames(water_corr_plot))
 
 # load packages for visualization
 library(ggcorrplot)
@@ -205,16 +165,8 @@ ggcorrplot(water_corr_matrix, hc.order = TRUE,
 ```{r}
 # https://www.statology.org/principal-components-analysis-in-r/
 # set up data frame
-water_pca <- water_CDOM_final[,c(10:18)]
+water_pca <- water_corr_plot
 
-# pull kit IDs to change the row names for labels on the PCA plot
-kit_id <- water_CDOM_final[,1]
-
-# change row names of data frame used for PCA
-rownames(water_pca) <- kit_id
-```
-
-```{r}
 # calculate the principal components
 pc <- prcomp(water_pca, scale = TRUE)
 
@@ -239,12 +191,12 @@ biplot(pc, scale = 0)
 library(ggfortify) #ggfortify allows ggplot to work with PCA data
 # https://cran.r-project.org/web/packages/ggfortify/vignettes/plot_pca.html
 
-autoplot(pc, data = water_CDOM_final, colour = 'water_body', size = 3, loadings = TRUE,
+autoplot(pc, data = filter(water, !is.na(water_SUVA254)), colour = 'water_body', size = 3, loadings = TRUE,
          loadings.colour = 'black', loadings.label = TRUE) +
   theme_bw()
 
 # plot PCA again using water_systemtype
-autoplot(pc, data = water_CDOM_final, colour = 'water_systemtype', size = 3, loadings = TRUE,
+autoplot(pc, data = filter(water, !is.na(water_SUVA254)), colour = 'water_systemtype', size = 3, loadings = TRUE,
          loadings.colour = 'black', loadings.label = TRUE) +
   theme_bw()
 
@@ -252,13 +204,10 @@ autoplot(pc, data = water_CDOM_final, colour = 'water_systemtype', size = 3, loa
 
 ```{r}
 # plot SUVA on a map for regional trends (Chesapeake area specifically)
-CDOM_CB <- water_CDOM_final %>%
-  filter(region == "Chesapeake Bay")
-
 ggplot(data = usa) +
   geom_sf() +
   coord_sf(xlim = c(-77.5,-74.5), ylim = c(37.2,40)) +
-  geom_point(data = CDOM_CB, mapping = aes(x = water_longitude, y = water_latitude, color = SUVA254)) +
+  geom_point(data = water, mapping = aes(x = water_longitude, y = water_latitude, color = water_SUVA254)) +
   theme_bw() +
   labs(x = "Longitude", y = "Latitude", color = "SUVA 254") +
   scale_color_viridis()
@@ -268,6 +217,8 @@ ggplot(data = usa) +
 
 ```{r}
 # https://jonlefcheck.net/2012/10/24/nmds-tutorial-in-r/
+# COULD NEVER GET THE NMDS TO WORK
+
 # load necessary packages
 library(vegan)
 
@@ -291,6 +242,13 @@ orditorp(site_NMDS, display = "sites", cex = 1.25)
 ```{r}
 # http://www.sthda.com/english/wiki/beautiful-dendrogram-visualizations-in-r-5-must-known-methods-unsupervised-machine-learning
 # https://www.r-bloggers.com/2021/04/cluster-analysis-in-r/
+
+# change row names of water_pca dataset
+water_kit_id <- water %>%
+  filter(!is.na(water_SUVA254)) %>%
+  select(kit_id)
+
+row.names(water_pca) <- water_kit_id$kit_id
 
 # compute Euclidean distance between samples
 water_dist <- dist(scale(water_pca), method = "euclidean")
@@ -326,7 +284,7 @@ dendr_ends <- dendr_segments %>%
   filter(yend == 0) %>%
   left_join(dendr_data$labels, by = "x") %>%
   rename(kit_id = label) %>%
-  left_join(water_CDOM_final, by = "kit_id")
+  left_join(water, by = "kit_id")
 
 # create vector of colors for the different regions
 water_body_colors <- c("Chesapeake Bay" = "red" , "Delaware Bay" = "dark green", "Great Lakes" = "blue")
@@ -345,31 +303,18 @@ ggplot() +
 ## Working with the Soil Data
 
 ```{r}
-# remove all columns except metadata and TC data
-soil_edit <- soil[,c(2,3,6)]
-
-# prep water NPOC data for merging
-NPOC_data <- water_map[,c(1,2,4:8)]
-colnames(NPOC_data)[2] <- "water_npoc_mgl"
-
-# merge two dataframes
-water_soil_carbon <- left_join(NPOC_data, soil_edit, by = "kit_id")
-
-# set three columns in dataset to be factor variables
-water_soil_carbon$transect_location <- factor(water_soil_carbon$transect_location, levels = c("Wetland", "Transition", "Upland"))
-water_soil_carbon$water_body <- as.factor(water_soil_carbon$water_body)
-water_soil_carbon$region <- as.factor(water_soil_carbon$region)
-
 # remove NA - should just be site 41 - step can be removed once metadata is replaced
 # 57 and 60 have no soil samples
-water_soil_carbon_noNA <- water_soil_carbon %>%
+# remove "sediment" locations
+water_soil_noNA <- water_soil %>%
   filter(!is.na(region)) %>%
-  filter(!is.na(tc_perc))
+  filter(!is.na(tc_perc)) %>%
+  filter(transect_location != "Sediment")
 ```
 
 ```{r}
 # plot overall relationship between soil and water carbon
-ggplot(na.omit(water_soil_carbon), aes(x = water_npoc_mgl, y = tc_perc, color = transect_location)) +
+ggplot(water_soil_noNA, aes(x = water_npoc_mgl, y = tc_perc, color = transect_location)) +
   geom_point() +
   facet_wrap(~transect_location, ncol = 2) +
   theme_bw() +
@@ -385,11 +330,11 @@ title_list <- c("Transition Soils", "Upland Soils", "Wetland Soils")
 
 for (n in 1:3) {
   # will cycle through the loop one time for each site location
-  filtered_data <- water_soil_carbon %>%
+  filtered_data <- water_soil_noNA %>%
     filter(transect_location == location_list[n])
   
   # make a faceted plot
-  plot <- ggplot(na.omit(filtered_data), aes(x = water_npoc_mgl, y = tc_perc, color = water_body)) +
+  plot <- ggplot(filtered_data, aes(x = water_npoc_mgl, y = tc_perc, color = water_body)) +
   geom_point() +
   theme_bw() +
   labs(title = title_list[n]) + stat_cor()
@@ -403,16 +348,15 @@ print(plot_list)
 
 ```{r}
 # new plots looking at water_systemtype
-
 second_plot_list = list()
 
 for (n in 1:3) {
   # will cycle through the loop one time for each site location
-  filtered_data <- water_soil_carbon %>%
+  filtered_data <- water_soil_noNA %>%
     filter(transect_location == location_list[n])
   
   # make a faceted plot
-  plot <- ggplot(na.omit(filtered_data), aes(x = water_npoc_mgl, y = tc_perc, color = water_systemtype)) +
+  plot <- ggplot(filtered_data, aes(x = water_npoc_mgl, y = tc_perc, color = water_systemtype)) +
   geom_point() +
   facet_wrap(~water_systemtype, ncol = 4) +
   theme_bw() +
@@ -427,12 +371,12 @@ print(second_plot_list)
 
 ```{r}
 # boxplot of the soil carbon percentages by transect location
-ggplot(water_soil_carbon_noNA, aes(x=water_body, y = tc_perc, fill = transect_location)) +
+ggplot(water_soil_noNA, aes(x=water_body, y = tc_perc, fill = transect_location)) +
   geom_boxplot() +
   theme_bw()
 
 # separate out the water system type
-ggplot(water_soil_carbon_noNA, aes(x=water_body, y = tc_perc, fill = transect_location)) +
+ggplot(water_soil_noNA, aes(x=water_body, y = tc_perc, fill = transect_location)) +
   geom_boxplot() +
   theme_bw() +
   facet_wrap(~ water_systemtype)
@@ -479,25 +423,25 @@ available_soils_sum <- available_soils_sum %>%
 ```{r}
 # prep metadata data frames!!
 # group the soil samples by Kit ID and then count how many per kit
-site_summary <- water_soil_carbon_noNA %>%
-  group_by(kit_id, water_npoc_mgl, water_latitude, water_longitude, region, water_systemtype, water_body) %>%
+site_summary <- water_soil %>%
+  filter(!(is.na(water_latitude) & is.na(water_npoc_mgl))) %>%
+  group_by(kit_id, water_npoc_mgl, water_latitude, water_longitude, region, water_systemtype, water_body,
+           water_tss_mg_perl, water_sal_psu, water_ph, water_orp_mv, water_alk_mgl_caco3) %>%
   summarize(soil_samples = n())
-
-# bring salinity data in!
-water_quality <- read.csv("~/EC1_WaterQuality_L0B_20220509.csv")
-site_summary_WQ <- left_join(site_summary, water_quality, by = "kit_id")
+  
 
 # merge soil availability with the metadata
-all_available_kits <- left_join(available_soils_sum, site_summary_WQ)
+all_available_kits <- left_join(available_soils_sum, site_summary)
 ```
+
+### Determine Target Sites - Full Transect + Water Sample, Enough Soil...
 
 ```{r}
 # FILTERING TO TARGET SITES
 filter_available_kits <- all_available_kits %>%
   filter(!is.na(water_npoc_mgl)) %>% # remove sites without water information
-  filter(UP_T_W == 3) %>% # remove sites that do not have the entire transect present
-  select(-transect_location) # remove this column for better merging
-
+  filter(UP_T_W == 3) # remove sites that do not have the entire transect present
+  
 # bring in excel sheet with soil amounts classified
 soil_availability_class <- readxl::read_excel("~/EC1_WSOM_Feasibility.xlsx")
 
@@ -558,12 +502,11 @@ for (a in 1:nrow(soil_class_sum)) {
 # merge these scores with the filtered kits metadata
 target_sites <- left_join(soil_class_sum, filter_available_kits, by = "kit_id")
 
-# remove unnecessary columns
-target_sites <- target_sites[,-c(8,15,16,21:24)]
-
 # make final score a factor variable for easier mapping
 target_sites$final_score <- as.factor(target_sites$final_score)
 ```
+
+### Map Target Kits for Spatial Layout and Env Conditions Represented
 
 ```{r}
 # maps of kits left that fit the criteria
@@ -607,7 +550,7 @@ ggplot(data = usa) +
 ggplot(data = usa) +
   geom_sf() +
   coord_sf(xlim = c(-77.5,-74.5), ylim = c(37.2,40)) +
-  geom_point(data = target_sites, mapping = aes(x = water_longitude, y = water_latitude, color = sal_psu)) +
+  geom_point(data = target_sites, mapping = aes(x = water_longitude, y = water_latitude, color = water_sal_psu)) +
   theme_bw() +
   labs(x = "Longitude", y = "Latitude")
 
@@ -619,6 +562,8 @@ ggplot(data = gl) +
   theme_bw() +
   labs(x = "Longitude", y = "Latitude")
 ```
+
+### Look at Env Conditions Represented by Kits Already Extracted
 
 ```{r}
 # old vs new selected sites
@@ -650,14 +595,14 @@ original_extract_sites <- target_sites %>%
 ggplot(data = gl) +
   geom_sf() +
   coord_sf(xlim = c(-92,-75), ylim = c(37,47)) +
-  geom_point(data = original_extract_sites, mapping = aes(x = water_longitude, y = water_latitude, color = sal_psu), size = 2) +
+  geom_point(data = original_extract_sites, mapping = aes(x = water_longitude, y = water_latitude, color = water_sal_psu), size = 2) +
   theme_bw() +
   labs(x = "Longitude", y = "Latitude")
 
 ggplot(data = usa) +
   geom_sf() +
   coord_sf(xlim = c(-77.5,-74.5), ylim = c(37.2,40)) +
-  geom_point(data = original_extract_sites, mapping = aes(x = water_longitude, y = water_latitude, color = sal_psu), size = 2) +
+  geom_point(data = original_extract_sites, mapping = aes(x = water_longitude, y = water_latitude, color = water_sal_psu), size = 2) +
   theme_bw() +
   labs(x = "Longitude", y = "Latitude")
 
@@ -665,88 +610,48 @@ ggplot(data = usa) +
 ggplot(data = gl) +
   geom_sf() +
   coord_sf(xlim = c(-92,-75), ylim = c(37,47)) +
-  geom_point(data = final_extract_sites, mapping = aes(x = water_longitude, y = water_latitude, color = sal_psu), size = 2) +
+  geom_point(data = final_extract_sites, mapping = aes(x = water_longitude, y = water_latitude, color = water_sal_psu), size = 2) +
   theme_bw() +
   labs(x = "Longitude", y = "Latitude")
 
 ggplot(data = usa) +
   geom_sf() +
   coord_sf(xlim = c(-77.5,-74.5), ylim = c(37.2,40)) +
-  geom_point(data = final_extract_sites, mapping = aes(x = water_longitude, y = water_latitude, color = sal_psu), size = 2) +
+  geom_point(data = final_extract_sites, mapping = aes(x = water_longitude, y = water_latitude, color = water_sal_psu), size = 2) +
   theme_bw() +
   labs(x = "Longitude", y = "Latitude")
 ```
 
+### Look at Soil Characteristics for Target Sites vs Already Extracted Sites 
+
 ```{r}
-# bring in soils metadata to look at gradients in characteristics
-all_soil_info <- readRDS("soils_data_merged_withmeta (4).rds")
-
 # cut soil information down to the sites used
-soil_info_sites <- all_soil_info %>%
-  filter(kit_id %in% final_extract_sites$kit_id)
-
-# get lat/long info for the WSOM extracts
-sites_lat_long <-sample_collection_metadata %>%
+soil_info_sites <- water_soil %>%
   filter(kit_id %in% final_extract_sites$kit_id) %>%
-  select(kit_id, contains("latitude")|contains("longitude")) %>%
-  select(-contains("sediment")) %>%
-  pivot_longer(-kit_id, 
-               names_to = c("transect_location", ".value"),
-               names_pattern = "(.+)_(.+)") %>%
-  mutate(transect_location = str_to_title(transect_location))
-
-# create data frame with lat/long and soil characteristics info for the extract sites
-extract_sites_soil_info <- soil_info_sites %>%
-  select(-contains("flag"), -date_run, -contains("collect")) %>%
-  filter(transect_location != "Sediment") %>%
-  full_join(sites_lat_long, by = c("kit_id", "transect_location"))
+  filter(transect_location != "Sediment")
   
 ```
 
 ```{r}
 # look at all sites in the Chesapeake that could be extracted
-target_sites_soils_info <- all_soil_info %>%
+target_sites_soils_info <- water_soil %>%
   filter(state == "VA" | state == "MD") %>%
   filter(kit_id %in% target_sites$kit_id) %>%
   filter(transect_location != "Sediment")
 
-target_sites_lat_long <- sample_collection_metadata %>%
-  filter(kit_id %in% target_sites_soils_info$kit_id) %>%
-  select(kit_id, contains("latitude")|contains("longitude")) %>%
-  select(-contains("sediment")) %>%
-  pivot_longer(-kit_id, 
-               names_to = c("transect_location", ".value"),
-               names_pattern = "(.+)_(.+)") %>%
-  mutate(transect_location = str_to_title(transect_location))
-
-target_sites_soils_info <- target_sites_soils_info%>%
-  select(-contains("flag"), -date_run, -contains("collect")) %>%
-  full_join(target_sites_lat_long, by = c("kit_id", "transect_location"))
-
-# bring in water data too
-target_sites_water <- target_sites_soils_info %>%
-  filter(transect_location == "Water") %>%
-  select(kit_id, transect_location, latitude, longitude) %>%
-  left_join(select(target_sites, kit_id, water_npoc_mgl, sal_psu, ph, orp_mv, alk_mgl_caco3))
-
-# bind soils and water info together
+# create variable to highlight whether or not a kit has been extracted
 target_sites_soils_info <- target_sites_soils_info %>%
-  filter(transect_location != "Water")
-
-target_sites_soils_water <- bind_rows(target_sites_soils_info, target_sites_water) %>%
-  group_by(kit_id) %>%
   mutate(already_extracted = ifelse(kit_id %in% final_extract_sites$kit_id,
                                     "YES",
                                     "NO"))
 
 # use newly created dataset to look at range in specific conductance and pH
-target_sites_soils_water %>%
-  filter(transect_location != "Water") %>%
+target_sites_soils_info %>%
   ggplot(aes(x = factor(transect_location, levels = c("Upland", "Transition", "Wetland")), y = specific_conductance_us_cm, color = kit_id, shape = already_extracted)) +
   geom_point() +
   labs(x = "Transect Location")
 
-target_sites_soils_water %>%
+target_sites_soils_info %>%
   ggplot(aes(x = factor(transect_location, levels = c("Upland", "Transition", "Wetland", "Water")), y = ph, color = kit_id, shape = already_extracted)) +
   geom_point() +
   labs(x = "Transect Location")
@@ -756,7 +661,7 @@ target_sites_soils_water %>%
 ```{r}
 # zoom in on sites already extracted
 # look at values of specific conductance by kit
-target_sites_soils_water %>%
+target_sites_soils_info %>%
   filter(already_extracted == "YES") %>%
   filter(transect_location != "Water") %>%
   ggplot(aes(x = factor(transect_location, levels = c("Upland", "Transition", "Wetland")), y = specific_conductance_us_cm, color = kit_id)) +
@@ -764,7 +669,7 @@ target_sites_soils_water %>%
   labs(x = "Transect Location")
 
 # look at values of pH by kit
-target_sites_soils_water %>%
+target_sites_soils_info %>%
   filter(already_extracted == "YES") %>%
   ggplot(aes(x = factor(transect_location, levels = c("Upland", "Transition", "Wetland", "Water")), y = ph, color = kit_id)) +
   geom_point() +

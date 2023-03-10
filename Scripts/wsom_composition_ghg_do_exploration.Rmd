@@ -21,8 +21,8 @@ pacman::p_load(tidyverse,
                GGally, ggcorrplot) # for nice-looking correlation matrices
 
 # load necessary data
-ghg <- read_csv("./Downloaded Data/EC1_GHG_data_PR.csv")
-wsom_cdom <- read_csv("./WSOM Extracts Data/EC1_WSOC_Extracts_Nov2022_SpectralIndices.csv")
+ghg <- read_csv("../Downloaded Data/EC1_GHG_data_PR.csv")
+wsom_cdom <- read_csv("../WSOM Extracts Data/EC1_WSOC_Extracts_Nov2022_SpectralIndices.csv")
 ```
 
 ```{r}

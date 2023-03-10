@@ -19,16 +19,12 @@ pacman::p_load(tidyverse,
                ggfortify,
                GGally)
 
-# set data files location
-cdom_data_location = paste0(getwd(), "/Original Data Files")
+# load rds file for surface water data
+water_cdom <- read_rds("water_data_mergedwithallmeta.rds")
 
-# csv files for CDOM data
-water_cdom_peaks <- read_csv(paste0(cdom_data_location, "/EC1_Water_CDOM_DOCnormalizedpeakpicks_20221011.csv"))
-water_cdom_indices <- read_csv(paste0(cdom_data_location, "/EC1_Water_CDOM_SpectralIndices_20221011.csv"))
-
-extracts_cdom_peaks <- read_csv(paste0(cdom_data_location,
-                                       "/EC1_WSOC_Extracts_Nov2022_PeakPicks_DOCnormalized.csv"))
-extracts_cdom_indices <- read_csv(paste0(cdom_data_location, "/EC1_WSOC_Extracts_Nov2022_SpectralIndices.csv"))
+# load csv files for extract spectral data
+extracts_cdom_peaks <- read_csv("./WSOM Extracts Data/EC1_WSOC_Extracts_Nov2022_PeakPicks_DOCnormalized.csv")
+extracts_cdom_indices <- read_csv("./WSOM Extracts Data/EC1_WSOC_Extracts_Nov2022_SpectralIndices.csv")
 ```
 
 ## Set-Up
@@ -53,7 +49,7 @@ output_directory <- "./Saved Figures"
 ## Aqualog Abs Data Figure
 
 ```{r}
-abs_path <- "C:/Users/mcel487/OneDrive - PNNL/Documents/SULI Project 2022/CDOM Data/EC1_WSOC_Extracts_CDOM_processed/5. Corrected Absorbance Files_ESS_DIVE/K035 UP_DilCorr_Abs.dat"
+abs_path <- "C:/Users/mcel487/OneDrive - PNNL/Documents/GitHub/COMPASS-DOE/JuliaSULI/WSOM Extracts Data/K035 UP_DilCorr_Abs.dat"
 
 # precheck to look at data format
 readLines(abs_path, n = 10)
@@ -66,13 +62,19 @@ ggplot(abs_spectra, aes(x = Wavelength..nm., y = Dilution.Corrected.Absorbance))
   labs(x = "Wavelength (nm)", y = "Absorbance") +
   scale_x_continuous(breaks = seq(200, 800, by = 100))
 
-ggsave("abs_spectra.png", path = output_directory,
-       width = 7, height = 5)
+#ggsave("abs_spectra.png", path = output_directory, width = 7, height = 5)
 ```
 
 ## Data Preparation
 
 ```{r CDOM data frame edits}
+# reduce columns on water data
+water_cdom_original <- water_cdom %>%
+  select(campaign, kit_id, contains("water"), collection_date:region)
+
+# remove "water_" from all the water info columns
+colnames(water_cdom_original)[grepl("water", colnames(water_cdom_original))] <- gsub("water_", "", colnames(water_cdom_original)[grepl("water", colnames(water_cdom_original))])
+
 # remove the CDOM standards
 extracts_cdom_indices <- extracts_cdom_indices %>%
   filter(!is.na(SUVA254))
@@ -81,24 +83,18 @@ extracts_cdom_indices <- extracts_cdom_indices %>%
 names(extracts_cdom_peaks) <- gsub(pattern = "_per_unitDOC", replacement = "", 
                                    x =names(extracts_cdom_peaks))
 
-names(water_cdom_peaks) <- gsub(pattern = "_per_unitDOC", replacement = "",
-                                x = names(water_cdom_peaks))
+names(water_cdom_original) <- gsub(pattern = "_per_unitDOC", replacement = "",
+                                x = names(water_cdom_original))
 
 # make sure all CDOM output spreadsheets match with kit_id column
 colnames(extracts_cdom_indices)[1] <- "kit_id"
 colnames(extracts_cdom_peaks)[1] <- "kit_id"
-colnames(water_cdom_indices)[1] <- "kit_id"
-colnames(water_cdom_peaks)[1] <- "kit_id"
+colnames(water_cdom_original)[2] <- "kit_id"
 
 # merge peaks and indices together
 extracts_cdom_original <- left_join(extracts_cdom_indices, extracts_cdom_peaks, by = "kit_id")
-water_cdom <- left_join(water_cdom_indices, water_cdom_peaks, by = "kit_id")
 
 # add a transect_location column
-water_cdom <- water_cdom %>%
-  mutate(transect_location = "Water")
-water_cdom <- water_cdom[,c(1,2,27,3:26)]
-
 extracts_cdom_original <- extracts_cdom_original %>%
   mutate(transect_location = case_when(
     grepl("T", kit_id) ~ "Transition",
@@ -155,52 +151,44 @@ extracts_cdom <- extracts_cdom_original %>%
 
 ```{r}
 ## prepare big data frame of all CDOM metrics plus soil/water characteristics
-water_cdom <- water_cdom[,-2]
-
 # bring in metadata to get location information for the kits
-water_soil <- read_rds("./R Data Files/EC1_water_soil_data.rds")
+water_soil <- read_rds("EC1_water_soil_data.rds")
 
 # change region name for Chesapeake to Mid-Atlantic (for figures)
 water_soil <- water_soil %>%
   mutate(region = ifelse(region == "Chesapeake Bay", "Mid-Atlantic", "Great Lakes"))
 water_soil$region <- as.factor(water_soil$region)
 
-# merge info with cdom data
-water_soil <- water_soil %>%
-  filter(transect_location != "Sediment")
-
-# merge water characteristics with CDOM information
-water_info <- water_soil %>%
-  select(campaign, kit_id, state, region, contains("water")) %>%
-  unique() %>%
-  filter(!is.na(state))
-
-water_cdom_info <- water_cdom %>%
-  filter(kit_id %in% extracts_cdom$kit_id) %>%
-  left_join(water_info, by = "kit_id") %>%
-  rename(ph = water_ph) %>%
-  relocate(campaign:water_systemtype, .before = SUVA254)
-
 # merge soil characteristics with extract CDOM info
 extracts_cdom_info <- extracts_cdom %>%
   filter(!is.na(SUVA254)) %>%
-  left_join(select(water_soil, campaign:water_systemtype, transect_location:percent_sand)) %>%
+  left_join(select(water_soil, campaign:water_body, water_systemtype, transect_location:percent_sand)) %>%
   relocate(campaign:water_systemtype, .before = SUVA254)
 
-# bind extracts and water together
-cdom_water_extracts <- bind_rows(extracts_cdom_info, water_cdom_info)
+# filter water info to just extract kits and bind extracts and water together
+cdom_water_extracts <- water_cdom_original %>%
+  filter(kit_id %in% extracts_cdom_info$kit_id) %>%
+  bind_rows(extracts_cdom_info)
 
 # work with factor variables
 cdom_water_extracts$kit_id <- as.factor(cdom_water_extracts$kit_id)
 cdom_water_extracts$transect_location <- factor(cdom_water_extracts$transect_location,
                                                levels = c("Upland", "Transition", "Wetland", "Water"))
+
+# make sure regions are the same between extracts and surface water
+cdom_water_extracts <- cdom_water_extracts %>%
+  mutate(region = case_when(
+    region == "Chesapeake Bay" ~ "Mid-Atlantic",
+    TRUE ~ region
+  ))
 ```
 
 ## Preliminary PCA
 
 ```{r}
 # set up data frame
-pca_extracts_cdom <- cdom_water_extracts[,c(8,9,11,13:18)]
+pca_extracts_cdom <- cdom_water_extracts %>%
+  select(SUVA254, S275_295, S350_400, Sr:BIX)
 
 # pull kit IDs to change the row names for labels on the PCA plot
 extracts_kit_id <- cdom_water_extracts[,1]
@@ -279,8 +267,7 @@ new_pca_plot + scale_fill_manual(values = palette) +
   scale_color_manual(values= palette) +
   labs(color = "Gradient Location", fill = "Gradient Location", shape = "Region")
 
-ggsave("cdom_pca.png", path = output_directory,
-       width = 9, height = 5)
+#ggsave("cdom_pca.png", path = output_directory, width = 9, height = 5)
 
 ```
 
@@ -317,7 +304,8 @@ ggplot(ggdata) +
 
 ```{r, message = FALSE, warning = FALSE}
 cdom_corr <- pca_extracts_cdom
-cdom_groups <- as.data.frame(cdom_water_extracts[,2])
+cdom_groups <- as.data.frame(cdom_water_extracts[,3])
+colnames(cdom_groups) <- "transect_location"
 
 # correlation scatter plot
 ggpairs(cdom_corr, ggplot2::aes(color = cdom_groups$transect_location),
@@ -337,8 +325,7 @@ ggplot(cdom_water_extracts, aes(x = SUVA254, y = S350_400, color = transect_loca
   scale_color_manual(values = palette) +
   labs(x = "SUVA at 254 nm", y = "Spectral Slope 350-400 nm", color = "Gradient Location")
 
-ggsave("SUVA254_S350_400.png", path = output_directory,
-       height = 5, width = 7)
+#ggsave("SUVA254_S350_400.png", path = output_directory, height = 5, width = 7)
 ```
 
 ```{r}
@@ -348,8 +335,7 @@ ggplot(cdom_water_extracts, aes(x = FI, y = FRESH, color = transect_location)) +
   scale_color_manual(values = palette) +
   labs(x = "Fluorescense Index", y = "Freshness Index", color = "Gradient Location")
 
-ggsave("FI_FRESH.png", path = output_directory,
-       height = 5, width = 7)
+#ggsave("FI_FRESH.png", path = output_directory, height = 5, width = 7)
 ```
 
 ### Summary Stats for FRESH, FI, HIX, SUVA254, and S350_400
@@ -419,8 +405,8 @@ HIX <- ggplot(cdom_water_extracts, aes(x = transect_location, y = HIX, color = t
 ggarrange(SUVA, SS, FI, FRESH, HIX,
           labels ="AUTO", align = "hv")
 
-ggsave("cdom_indices_boxplots.png", path = output_directory,
-       width = 16, height = 9)
+#ggsave("cdom_indices_boxplots.png", path = output_directory,
+       #width = 16, height = 9)
 ```
 
 ```{r}
@@ -466,6 +452,14 @@ dunn_test(cdom_water_extracts, HIX ~ transect_location, p.adjust.method = "holm"
 ## Exploring Optical Metrics vs Other Soil Characteristics for CB Sites
 
 ```{r}
+# edit water body variable 
+cdom_water_extracts <- cdom_water_extracts %>%
+  mutate(water_body = case_when(
+    state == "VA"|state == "MD" ~ "Chesapeake Bay",
+    state == "PA"|state == "DE" ~ "Delaware Bay",
+    TRUE ~ "Great Lakes"
+  ))
+
 # create dataset that is just Chesapeake
 cb_cdom_water_extracts <- cdom_water_extracts %>%
   filter(water_body == "Chesapeake Bay")
@@ -489,7 +483,8 @@ ggplot(filter(cb_cdom_water_extracts, transect_location != "Water"), aes(x = spe
   geom_point()
 
 # salinity vs SUVA254 (for water samples)
-ggplot(filter(cb_cdom_water_extracts, transect_location == "Water"), aes(x = water_sal_psu, y = SUVA254, color = transect_location)) +
+ggplot(filter(cb_cdom_water_extracts, transect_location == "Water"), aes(x = sal_psu, y = SUVA254, color = transect_location)) +
   geom_point()
 
 ```
+

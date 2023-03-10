@@ -19,14 +19,10 @@ packages_list <- c("tidyverse", "broom", "ggpubr", "sf", "ggspatial",
 
 lapply(packages_list, library, character.only = TRUE)
 
-# set data files location
-data_location = paste0(getwd(), "/R Data Files")
-
 # RDS files - master water/soil data, sample site coordinates, wsom concentrations
-water_soil <- read_rds(paste0(data_location, "/EC1_water_soil_data.rds"))
-site_coordinates <- read_rds(paste0(data_location, 
-                                    "/sample_collection_coordinates.rds"))
-wsom_conc <- read_rds(paste0(data_location, "/wsom_conc.rds"))
+water_soil <- read_rds("./EC1_water_soil_data.rds")
+site_coordinates <- read_csv("./kit_sample_locations_lat_long.csv")
+wsom_conc <- read_csv("./WSOM Extracts Data/wsom_conc_rep_avg.csv")
 
 # change region name for Chesapeake to Mid-Atlantic (for figures)
 water_soil <- water_soil %>%
@@ -115,7 +111,7 @@ ggplot(data = gl) +
   labs(x = "", y = "")
 
 # export map for presentation
-ggsave("site_map.png", plot = last_plot(), path = output_directory)
+#ggsave("site_map.png", plot = last_plot(), path = output_directory)
 
 # zoom in on chesapeake and plot the full transect
 ggplot(data = gl) +
@@ -128,7 +124,7 @@ ggplot(data = gl) +
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
 
 # export map
-ggsave("chesapeake_site_map.png", plot = last_plot(), path = output_directory)
+#ggsave("chesapeake_site_map.png", plot = last_plot(), path = output_directory)
 ```
 
 ## Patterns in WSOC and WSON
@@ -170,7 +166,7 @@ ggplot(wsom_extracts) +
   scale_fill_manual(values = palette) +
   labs(x = "Gradient Location", y = "WSOC Concentration (mg/g soil)")
 
-ggsave("wsoc_location_boxplot.png", path = output_directory)
+#ggsave("wsoc_location_boxplot.png", path = output_directory)
 
 # non-parametric ANOVA
 kt_wsoc <- kruskal.test(wsoc_conc ~ transect_location, data = wsom_extracts)
@@ -219,7 +215,7 @@ ggplot(wsom_extracts) +
   geom_point(aes(x = region, y = wsoc_conc, color = transect_location), position = position_jitterdodge(), size = 2) +
   scale_color_manual(values = palette)
 
-ggsave("wsoc_conc_region_location.png", path = output_directory, width = 7, height = 5)
+#ggsave("wsoc_conc_region_location.png", path = output_directory, width = 7, height = 5)
 
 # non-parametric ANOVA
 kt_wsoc_region <- kruskal.test(wsoc_conc ~ region, data = wsom_extracts)
@@ -251,8 +247,7 @@ ggplot(surface_water, aes(x = region, y = water_npoc_mgl, color = transect_locat
   scale_color_manual(values = palette[4]) +
   labs(color = "", x = "", y = "DOC Concentration (mg/L)")
 
-ggsave("water_doc.png", path = output_directory, 
-       width = 7, height = 5)
+#ggsave("water_doc.png", path = output_directory, width = 7, height = 5)
 ```
 
 ```{r}
@@ -327,7 +322,8 @@ sum_doc$se <- sum_doc$sd/(sqrt(sum_doc$n))
 
 ```{r}
 # pull variables
-wsoc_corr <- wsom_extracts[,c(16:18,20,29)]
+wsoc_corr <- wsom_extracts %>%
+  select(bulk_density_g_cm3, loi_perc, gwc_perc.x, tc_perc, wsoc_conc)
 
 # make correlation matrix
 wsoc_corr_matrix <- cor(wsoc_corr, use = "complete.obs")
@@ -340,8 +336,8 @@ ggcorrplot(wsoc_corr_matrix, hc.order = TRUE,
 
 ```{r, warning = FALSE, message = FALSE}
 # matrix of scatterplots
-# set the grouping variable for graphing
-groups <- wsom_extracts[,15]
+# set the grouping variable for graphing - the transect location
+groups <- wsom_extracts[,63]
 
 # plot with base R
 pairs(wsoc_corr,
@@ -376,8 +372,7 @@ ggplot(wsom_extracts, aes(x = tc_perc, y = wsoc_conc)) +
 # can also put the full equation (label = ..eq.label..), AIC, BIC...
 
 # save plot
-ggsave("wsoc_tc_scatter.png", plot = last_plot(), path = output_directory,
-       width = 7, height = 5)
+#ggsave("wsoc_tc_scatter.png", plot = last_plot(), path = output_directory,width = 7, height = 5)
 ```
 
 ```{r}
@@ -405,8 +400,7 @@ ggplot(wsom_extracts, aes(x = loi_perc, y = wsoc_conc)) +
   geom_point(aes(color = transect_location), size = 2.5) +
   stat_regline_equation(aes(label = ..rr.label..), size = 5)
 
-ggsave("wsoc_loi.png", plot = last_plot(), path = output_directory,
-       width = 7, height = 5)
+#ggsave("wsoc_loi.png", plot = last_plot(), path = output_directory, width = 7, height = 5)
 ```
 
 ```{r}
@@ -445,4 +439,6 @@ ggplot(wsom_extracts, aes(x=tc_perc, y = water_npoc_mgl, color = transect_locati
   geom_point() +
   scale_color_manual(values = palette) +
   facet_wrap(~transect_location)
+
+# take away here is that wsoc concentration does not have a more definable relationship with surface water doc vs soil total carbon
 ```
