@@ -1,0 +1,18 @@
+Peak,Peak Description,Excitation,Emission,Reference,DOI
+C,Visible Humic-Like,Max: 320-360,Max 420-460,"Wunsch et al., 2019",10.1039/C8AY02422G
+A,UV Humic Like,260,Max:400-460,"Wunsch et al., 2019",10.1039/C8AY02422G
+T,Protein-Like (Tryptophan),275,Max: 300-350,"Wunsch et al., 2019",10.1039/C8AY02422G
+B,Protein-Like (Tyrosine),275,Max:295-315,"Wunsch et al., 2019",10.1039/C8AY02422G
+M,Microbial Humic-Like,Max: 290-310,Max: 370-410,"Wunsch et al., 2019",10.1039/C8AY02422G
+FI,Related to contribution of microbial (high) vs terrestrial sources (low),370,470/520,"McKnight et al., 2001",10.4319/lo.2001.46.1.0038
+HIX,Related to the degree of humification,254,(435_480)/[(300_345)+(435_480)],Ohno 2002,10.1021/es0155276
+Fresh,Related to freshly produced DOM,310,380/Max: 420_435,"Parlanti et. al., 2000",10.1016/S0146-6380(00)00124-8
+BIX,Related to autotrophic activity (>1 value indicates recently generated DOM),310,380/430,"Huguet et al., 2009",10.1016/j.orggeochem.2009.03.002
+FDOM,"Common in situ sensor Ex/Em pair, most closely resembles C peak",365,480,"Downing et al., 2012",10.4319/lom.2012.10.767
+,,,,,
+,,,,,
+E2toE3,Ratio of A250 to A365,A254/A365,Related with molecular weight and aromaticity,Peuravuori and Pihlaja 1997,doi: 10.1016/S0003-2670(96)00412-6
+SUVA254,Specific UV Absorbance at 254 nm,(A254/DOC)*100 (units: L per mgC-m),Related with DOM aromaticity,"Weishaar et al., 2003",10.1021/es030360x
+S275-295,Spectral slope from 275-295 nm,ln(slope275-295),Higher generally related with lower molecular weight DOM,"Helms et al., 2008",lo.2008.53.3.0955
+S350-400,Spectral slope from 350-400 nm,ln(slope350-400),"Higher values generally idicated more aromatic, higher molecular weight DOM","Helms et al., 2008",lo.2008.53.3.0955
+Sr,Spectral Slope Ratio,S275-295/S350-400,Inverseley related with DOM molecular size,"Helms et al., 2008",lo.2008.53.3.0955
