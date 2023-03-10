@@ -1,0 +1,327 @@
+---
+title: "EXCHANGE LULC Data"
+output: html_document
+date: "2023-02-27"
+---
+
+This RMarkdown file represents a workflow to work with imported raster data to extract
+environmental information about each of the EXCHANGE kit sample locations. The script
+uses a .csv file of all of the sample locations that was made based on a spreadsheet of
+Collection Level metadata.
+
+The general spatial data workflow I used was:
+1. make sure points for extraction are spatial objects
+2. load in spatial datasets (both of the files used here were raster .tif files)
+3. reproject extraction points to a coordinate reference system that matches the desired raster data
+4. write out shapefiles of the extraction points to load into QGIS with the .tif files
+5. extract! and then merge with classification keys for the rasters
+6. double check the R extraction values for a few random kits with QGIS
+7. reextract for sample locations that shouldn't really be classified as open water
+to provide information on surrounding land cover/vegetation types
+8. write out a final csv file
+9. immediately create a README excel spreadsheet to explain all the column names for other data users
+
+** Just an important note: typical functions like "select" that work in the tidyverse
+need to be specified dplyr::select() to make them work while spatial data packages are loaded!
+
+## Set-Up
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# load packages
+require(pacman)
+pacman::p_load(tidyverse,
+               raster,
+               sp,
+               rgdal,
+               googledrive,
+               janitor)
+
+# make sure to check wd to determine relative file pathing!
+getwd()
+
+```
+
+```{r load-data}
+# load kit lat long data
+sample_locations_lat_long <- read_csv("kit_sample_locations_lat_long.csv")
+
+```
+
+## Prepare EXCHANGE Site Coordinates
+
+```{r}
+# set to a data frame - sometimes reads in as a special tibble which makes subsequent data edits difficult
+sample_locations_lat_long <- as.data.frame(sample_locations_lat_long)
+
+# remove NA coordinates
+sample_locations_noNA <- sample_locations_lat_long %>%
+  filter(!(latitude %in% NA) | !(longitude %in% NA))
+
+# cut data to just lat and long
+lat_long <- dplyr::select(sample_locations_noNA, latitude, longitude)
+
+# set lat and long to coordinates (make them a spatial object)
+coordinates(lat_long) <- c("longitude", "latitude")
+
+```
+
+## C-CAP Land Cover Data
+
+This dataset is based on the National Land Cover Database (NLCD) but adapted for better classification
+of coastal ecosystems.
+
+Dataset Citation:
+National Oceanic and Atmospheric Administration, Office for Coastal Management. “Regional (30-meter) C-CAP Land Cover Data.” Coastal Change Analysis Program (C-CAP) Regional Land Cover. Charleston, SC: NOAA Office for Coastal Management. Accessed February 2023 at www.coast.noaa.gov/htdata/raster1/landcover/bulkdownload/30m_lc/.
+
+A legend for the classification system used in this dataset was digitized in a .csv file based on this NOAA-provided document:
+https://coast.noaa.gov/data/digitalcoast/pdf/ccap-class-scheme-regional.pdf
+
+```{r CRS-setup}
+# load tif file
+# not in GitHub repo because it's a VERY large file - will need to be downloaded to local repository
+ccap <- raster::raster("conus_2016_ccap_landcover_20200311.tif")
+
+# pull CRS of the tif file
+ccap_crs <- CRS(proj4string(ccap))
+
+# assign some sort of CRS to the points (in this case the NAD83 reference)
+# they have to have just some kind of CRS before the CRS can be transformed to match that of the raster file
+proj4string(lat_long) <- CRS("+proj=longlat +ellps=GRS80 +datum=NAD83") 
+
+# transform CRS to the ccap CRS to match
+ccap_lat_long <- spTransform(lat_long, ccap_crs)
+
+# export shapefile to double check R operations in QGIS
+# the raster file can be loaded into QGIS alongside these points and QGIS's extract can be run as a comparison
+#raster::shapefile(ccap_lat_long, "./Processed Data/all_sample_sites_ccap.shp")
+
+```
+
+```{r extraction}
+# extract land cover information based on lat/long points
+ccap_landcover <- extract(ccap, ccap_lat_long)
+
+# merge this info back with site information
+CCAP_sample_locations <- sample_locations_noNA
+CCAP_sample_locations$ccap_landcover_value <- ccap_landcover
+
+# load the ccap key and then match definition for the extracted pixel values
+ccap_key <- read_csv("C-CAP_land_cover_classification.csv")
+
+CCAP_sample_locations <- CCAP_sample_locations %>%
+  left_join(ccap_key, by = c("ccap_landcover_value" = "pixel_value"))
+
+# for this raster, a value of 0 (background) or 1 (unclassified) means an issue with extracting values
+# check the dataset to see if any of those issues arose
+# if this code returns 0, there are no issue site locations!!!
+nrow(CCAP_sample_locations %>%
+  filter(ccap_landcover_value == 0 | ccap_landcover_value == 1))
+
+```
+
+```{r reextract-water-points}
+# it makes sense for water and sediment locations to be classified as open water
+# because of 30 x 30 resolution and inaccuracies with handheld GPS locations, land sites (wetland - upland)
+# ... could end up in a grid cell classified as water
+# check dataset to see which rows (wetland - upland) were classified as water
+reextract_CCAP <- CCAP_sample_locations %>%
+  filter(land_cover_class == "open water") %>%
+  filter(transect_location == "Wetland" | transect_location == "Transition" | transect_location == "Upland")
+
+# filter lat_long to these points
+ccap_reextract_lat_long <- reextract_CCAP %>%
+  dplyr::select(latitude, longitude)
+
+# same steps to make spatial object
+coordinates(ccap_reextract_lat_long) <- c("longitude", "latitude")
+
+proj4string(ccap_reextract_lat_long) <- CRS("+proj=longlat +ellps=GRS80 +datum=NAD83") 
+
+ccap_reextract_lat_long <- spTransform(ccap_reextract_lat_long, ccap_crs)
+  
+# reextract the above sites with a big buffer to get land cover values in adjacent grid cells
+ccap_reextract_landcover <- extract(ccap, ccap_reextract_lat_long, buffer = 30)
+```
+
+```{r final-data-frame-edits}
+# make data frame to hold values
+reextract_CCAP$new_ccap_landcover_value <- NA
+
+# eliminate "21" (which means open water) from the newly extracted list
+for (n in 1:nrow(reextract_CCAP)) {
+    
+    # cycle through the number of values in the corresponding list piece in the small buffered dataset
+    for(x in 1:length(ccap_reextract_landcover[[n]])) {
+      
+      # if that value in the list is not 11, pull it out
+      if (ccap_reextract_landcover[[n]][x] != 21) {
+        
+        # if the corresponding spot in the data frame is not filled in OR if the value matches the value that's already there, put it in the data frame
+        if(ccap_reextract_landcover[[n]][x] ==  reextract_CCAP$new_ccap_landcover_value[n]|is.na(reextract_CCAP$new_ccap_landcover_value[n])) {
+        reextract_CCAP$new_ccap_landcover_value[n] <- ccap_reextract_landcover[[n]][x]
+        }
+      }
+      
+    }
+  }
+# this loop worked for this dataset because there was only one alternative value for the sites
+# would need to be tweaked if the buffer returned more than one option surrounding
+
+# merge this new dataframe with the key and then with the full ccap datset
+reextract_CCAP <- left_join(reextract_CCAP, ccap_key, by = c("new_ccap_landcover_value" = "pixel_value")) %>%
+  rename(surrounding_land_cover_class = land_cover_class.y,
+         point_land_cover_class = land_cover_class.x)
+
+CCAP_sample_locations_final <- left_join(CCAP_sample_locations, reextract_CCAP,
+                                         by = c("kit_id", "transect_location", "latitude",
+                                                "longitude", "ccap_landcover_value", "land_cover_class" = "point_land_cover_class")) %>%
+  rename(point_land_cover_class = land_cover_class) %>%
+  arrange(kit_id)
+
+# write out csv file for this landcover data
+#write_csv(CCAP_sample_locations_final, "./Processed Data/CCAP_land_cover.csv")
+
+# MAKE SURE TO ADD EXCEL READ ME TO EXPLAIN THE COLUMNS OF THE EXPORTED DATA FRAME!
+# readme created with same name as the data file plus _README
+
+```
+
+
+## LANDFIRE Exisiting Vegetation Type (EVT) Data
+
+This dataset has highly detailed information about the various ecosystems of the US.
+Names the ecosystem but also provides information on vegetation physical appearance (e.g. trees vs shrubs vs grasses)
+and for example, further classification information like types of trees and/or specific species in a forest ecosystem type.
+
+Dataset was accessed from this information page: https://www.landfire.gov/evt.php
+
+This link pasted in an Internet browser is a direct download of the data .zip file: https://landfire.gov/bulk/downloadfile.php?FNAME=US_220_mosaic-LF2020_EVT_220_CONUS.zip&TYPE=landfire
+I unzipped this folder and only kept the .tif file.
+
+The classification key for this dataset was downloaded from:
+https://www.landfire.gov/CSV/LF2020/LF20_EVC_220.csv
+
+More detailed descriptions of each of the ecosystem classes can be found at:
+https://www.landfire.gov/documents/LANDFIRE_Ecological_Systems_Descriptions_CONUS.pdf
+
+```{r}
+# load tif file
+# also not in online GitHub repo - too large
+evt <- raster::raster("LC20_EVT_220.tif")
+
+# pull CRS of of the tif file
+evt_crs <- CRS(proj4string(evt))
+
+# reproject lat_long CRS to match tif file
+evt_lat_long <- spTransform(lat_long, evt_crs)
+# no need to re-export lat/long coordinates to check in QGIS since CCAP and the LANDFIRE tifs are in the same coordinate reference system
+# would extract a new set if the CRS changed
+
+# extract ecosystem information
+evt_ecosystem <- raster::extract(evt, evt_lat_long)
+
+# merge info back with kit location info
+EVT_sample_locations <- sample_locations_noNA
+EVT_sample_locations$evt_value <- evt_ecosystem
+
+# load in EVT key
+evt_key <- read_csv("LANDFIRE2020_EVT_classification.csv")
+
+# edit key column names based on data attributes description from source
+colnames(evt_key) <- c("value", "ecological_system_name", "lifeform_code", "fuel_code", 
+                       "fuel_name", "vegetation_lifeform", "vegetation_physiognomy", "vegetation_group_code",
+                       "vegetation_group", "dominant_vegetation_cover_type", "vegetation_order",
+                       "vegetation_class", "vegetation_subclass", "R", "G", "B", "RED", "GREEN", "BLUE")
+
+# cut down on columns to describe the extracted value
+evt_key_edit <- evt_key %>%
+  dplyr::select(-contains("code"), -contains("fuel"), -R, -G, -B, -RED, -BLUE, -GREEN)
+
+# produce data frame with vegetation type descriptions
+EVT_sample_locations <- EVT_sample_locations %>%
+  left_join(evt_key_edit, by = c("evt_value" = "value"))
+
+# for this raster, a value of -9999 (no data) means an issue with extracting values
+# check the dataset to see if any of those issues arose
+# if this code returns 0, there are no issue site locations!!!
+nrow(EVT_sample_locations %>%
+  filter(evt_value == -9999))
+
+```
+
+```{r}
+# again, we want to check transect locations that are NOT water and sediment for being classified as open water (7292)
+reextract_EVT <- EVT_sample_locations %>%
+  filter(evt_value == 7292) %>%
+  filter(transect_location == "Wetland" | transect_location == "Transition" | transect_location == "Upland")
+
+# filter lat_long to these points
+evt_reextract_lat_long <- reextract_EVT %>%
+  dplyr::select(latitude, longitude)
+
+# same steps to make spatial object
+coordinates(evt_reextract_lat_long) <- c("longitude", "latitude")
+
+proj4string(evt_reextract_lat_long) <- CRS("+proj=longlat +ellps=GRS80 +datum=NAD83") 
+
+evt_reextract_lat_long <- spTransform(evt_reextract_lat_long, evt_crs)
+  
+# reextract the above sites with a big buffer to get land cover values in adjacent grid cells
+evt_reextract_ecosystem <- extract(evt, evt_reextract_lat_long, buffer = 30)
+
+```
+
+```{r}
+# extract surrounding ecosystem values
+# make two data frame columns because there are 2 unique new values for some kits
+reextract_EVT$new_evt_value <- NA
+reextract_EVT$second_new_evt_value <- NA
+
+# eliminate "7292" (which means open water) from the newly extracted list
+for (n in 1:nrow(reextract_EVT)) {
+    
+    # cycle through the number of values in the corresponding list piece in the small buffered dataset
+    for(x in 1:length(evt_reextract_ecosystem[[n]])) {
+      
+      # if that value in the list is not 11, pull it out
+      if (evt_reextract_ecosystem[[n]][x] != 7292) {
+        
+        # if the corresponding spot in the data frame is not filled in OR if the value matches the value that's already there, put it in the data frame
+        if(evt_reextract_ecosystem[[n]][x] ==  reextract_EVT$new_evt_value[n]|
+           is.na(reextract_EVT$new_evt_value[n])) {
+        reextract_EVT$new_evt_value[n] <- evt_reextract_ecosystem[[n]][x]
+        }
+        # if the above conditions are NOT met, put the other non-water value in another column
+        else {
+          reextract_EVT$second_new_evt_value[n] <- evt_reextract_ecosystem[[n]][x]
+        }
+      }
+      
+    }
+}
+
+# merge just the ecological system name with the new evt values (twice, one for each column)
+reextract_EVT <- left_join(reextract_EVT, 
+                           dplyr::select(evt_key_edit, value, ecological_system_name), 
+                           by = c("new_evt_value" = "value")) %>%
+  rename(surrounding_ecological_system_name = ecological_system_name.y,
+         ecological_system_name = ecological_system_name.x)
+
+reextract_EVT <- left_join(reextract_EVT, 
+                           dplyr::select(evt_key_edit, value, ecological_system_name), 
+                           by = c("second_new_evt_value" = "value")) %>%
+  rename(another_surr_ecological_system_name = ecological_system_name.y,
+         ecological_system_name = ecological_system_name.x)
+
+# and join back to the other EVT dataset to make the final data file
+EVT_sample_locations_final <- left_join(EVT_sample_locations, reextract_EVT) %>%
+  rename(point_ecological_system_name = ecological_system_name) %>%
+  arrange(kit_id)
+
+# write out final csv
+#write_csv(EVT_sample_locations_final, "./Processed Data/LF_EVT_ecosystem_classes.csv")
+
+```
+
